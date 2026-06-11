@@ -1,0 +1,50 @@
+# claude-skills
+
+A collection of reusable [Claude Code](https://claude.com/claude-code) skills, distilled from real working sessions. Each skill is a self-contained folder with a `SKILL.md` (instructions + trigger) and any reference files it needs. They are model-agnostic in spirit but written for and tested with Claude Code.
+
+> Skills are progressive-disclosure instruction packs: a short description that tells the model *when* to load the skill, a body that loads on trigger, and reference files that load only when needed. See Anthropic's [Agent Skills](https://docs.claude.com/en/docs/agents-and-tools/agent-skills) docs.
+
+## Skills in this repo
+
+| Skill | What it does |
+|---|---|
+| [`figma-design-build`](skills/figma-design-build) | Build, edit, and read designs in Figma through the Figma MCP (the cloud `use_figma` plugin-API + `get_screenshot` loop), and do design-to-code. Encodes server-side font limits, load-before-edit, geometry/shear math, styles + components, organize-as-you-go layer hygiene, and a catalog of real gotchas. |
+| [`fusion-360-mcp`](skills/fusion-360-mcp) | Drive Autodesk Fusion 360 through the Fusion MCP for parametric CAD: sketches, extrudes, holes, fillets, joins/cuts, exports (STL/3MF/STEP), fit-view screenshots, and API-doc lookups. Encodes the safe script shape, tool-selection logic, the internal-cm unit gotcha, and a failure-mode catalog. |
+| [`skill-forge`](skills/skill-forge) | Crystallize a captured workflow journal into a validated, well-structured skill. The meta-skill for building more skills. |
+| [`workflow-capture`](skills/workflow-capture) | Maintain a durable, tagged journal of a complex multi-step workflow so it can later be distilled into a reusable skill. |
+
+## Install
+
+Skills load from `~/.claude/skills/` (available in every project) or `.claude/skills/` (one project). Put a skill folder in either location.
+
+**Clone and symlink the ones you want (recommended — stays in sync with `git pull`):**
+
+macOS / Linux:
+```bash
+git clone https://github.com/Mfrostbutter/claude-skills.git
+cd claude-skills
+ln -s "$PWD/skills/figma-design-build" ~/.claude/skills/figma-design-build
+```
+
+Windows (PowerShell, as admin or with Developer Mode on):
+```powershell
+git clone https://github.com/Mfrostbutter/claude-skills.git
+cd claude-skills
+New-Item -ItemType SymbolicLink -Path "$env:USERPROFILE\.claude\skills\figma-design-build" -Target "$PWD\skills\figma-design-build"
+```
+
+**Or just copy a folder** into `~/.claude/skills/` if you don't want the symlink.
+
+Then start (or restart) Claude Code — the skill is discovered automatically and invoked when your request matches its description.
+
+## How these are built
+
+Most of these were grown the same way: run a complex session with [`workflow-capture`](skills/workflow-capture) journaling the decisions, corrections, and dead ends, then run [`skill-forge`](skills/skill-forge) to distill that journal into a `SKILL.md`. The result is a skill that encodes hard-won, battle-tested knowledge rather than guesses.
+
+## Contributing
+
+Issues and PRs welcome. A good skill: a pushy description that lists concrete triggers, an imperative body under ~500 lines that explains *why* rules matter, and long/variant-specific detail pushed into `references/`. Keep skills generic — no machine paths, secrets, or business-specific identifiers.
+
+## License
+
+[MIT](LICENSE) © Michael Frostbutter
