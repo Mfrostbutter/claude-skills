@@ -10,8 +10,8 @@ A collection of reusable [Claude Code](https://claude.com/claude-code) skills, d
 |---|---|
 | [`figma-design-build`](skills/figma-design-build) | Build, edit, and read designs in Figma through the Figma MCP (the cloud `use_figma` plugin-API + `get_screenshot` loop), and do design-to-code. Encodes server-side font limits, load-before-edit, geometry/shear math, styles + components, organize-as-you-go layer hygiene, and a catalog of real gotchas. |
 | [`fusion-360-mcp`](skills/fusion-360-mcp) | Drive Autodesk Fusion 360 through the Fusion MCP for parametric CAD: sketches, extrudes, holes, fillets, joins/cuts, exports (STL/3MF/STEP), fit-view screenshots, and API-doc lookups. Encodes the safe script shape, tool-selection logic, the internal-cm unit gotcha, and a failure-mode catalog. |
-| [`skill-forge`](skills/skill-forge) | Crystallize a captured workflow journal into a validated, well-structured skill. The meta-skill for building more skills. |
-| [`workflow-capture`](skills/workflow-capture) | Maintain a durable, tagged journal of a complex multi-step workflow so it can later be distilled into a reusable skill. |
+
+> Looking for the skill-authoring meta-skills (`workflow-capture` + `skill-forge`)? They are the toolchain that *builds* skills like these, so they live in their own repo: **[skill-forge](https://github.com/Mfrostbutter/skill-forge)**.
 
 ## Install
 
@@ -39,7 +39,7 @@ Then start (or restart) Claude Code — the skill is discovered automatically an
 
 ## How these are built
 
-Most of these were grown the same way: run a complex session with [`workflow-capture`](skills/workflow-capture) journaling the decisions, corrections, and dead ends, then run [`skill-forge`](skills/skill-forge) to distill that journal into a `SKILL.md`. The result is a skill that encodes hard-won, battle-tested knowledge rather than guesses.
+Most of these were grown the same way: run a complex session with **`workflow-capture`** journaling the decisions, corrections, and dead ends, then run **`skill-forge`** to distill that journal into a `SKILL.md`. The result is a skill that encodes hard-won, battle-tested knowledge rather than guesses. Those two meta-skills are the authoring toolchain and live in their own repo: **[skill-forge](https://github.com/Mfrostbutter/skill-forge)**.
 
 ## Contributing
 
