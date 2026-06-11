@@ -7,3 +7,6 @@ desktop.ini
 **/.source/
 .tmp-*
 *.tmp
+
+# local planning notes (not for publication)
+.notes/
