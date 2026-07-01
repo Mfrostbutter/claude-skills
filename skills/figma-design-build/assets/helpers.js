@@ -36,6 +36,12 @@ function T(p,x,y,chars,family,style,size,hex,opts){opts=opts||{};const t=figma.c
 // ---- pill / chip (rect + label, sibling order) ----
 function chip(p,x,y,label,bgHex,fgHex,fontFamily,fontStyle){const t=figma.createText();p.appendChild(t);t.fontName={family:fontFamily||"Geist Mono",style:fontStyle||"SemiBold"};t.fontSize=11;t.letterSpacing={value:6,unit:"PERCENT"};t.characters=label;const w=t.width+24,h=t.height+12;const r=figma.createRectangle();p.appendChild(r);r.resize(w,h);r.x=x;r.y=y;r.cornerRadius=999;r.fills=fl(bgHex);r.name="chip-bg";p.appendChild(t);t.x=x+12;t.y=y+6;t.fills=fl(fgHex);t.name=label;return {w,h};}
 
+// ---- content-sized pill (rect auto-fit to label + padding) ----
+// Prefer this over a fixed-width rect with centered text: the box grows to the
+// text so labels never clip or kiss the edge. padX/padY default to comfortable
+// minimums. Centered on (cx, top y). Returns {w,h}.
+function pill(p,cx,y,label,bgHex,fgHex,family,style,size,padX,padY,rad){padX=padX==null?16:padX;padY=padY==null?11:padY;const t=figma.createText();p.appendChild(t);t.fontName={family:family||"Inter",style:style||"Medium"};t.fontSize=size||12;t.characters=label;const w=t.width+2*padX,h=t.height+2*padY;const r=figma.createRectangle();p.appendChild(r);r.resize(w,h);r.x=cx-w/2;r.y=y;r.cornerRadius=rad==null?999:rad;r.fills=fl(bgHex);r.name="pill-bg";p.appendChild(t);t.x=cx-t.width/2;t.y=y+padY;t.fills=fl(fgHex);t.name=label;return {w,h};}
+
 // ---- button (rect + label) ----
 function button(p,x,y,label,fillHex,labelHex,family,style){const t=figma.createText();p.appendChild(t);t.fontName={family:family||"Geist",style:style||"SemiBold"};t.fontSize=15.5;t.characters=label;const w=t.width+52,h=54;const r=figma.createRectangle();p.appendChild(r);r.resize(w,h);r.x=x;r.y=y;r.cornerRadius=12;r.fills=fl(fillHex);r.effects=BUTTON_SHADOW;r.name="button-bg";p.appendChild(t);t.x=x+26;t.y=y+(h-t.height)/2;t.fills=fl(labelHex);t.name=label;return w;}
 

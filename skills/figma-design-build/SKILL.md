@@ -36,7 +36,8 @@ The Figma MCP runs JavaScript against the **Figma Plugin API** (`use_figma`) and
    - **Bind to styles from the first draw** (`fillStyleId`, `textStyleId`, `effectStyleId`), not after. If the design system does not exist yet, create the styles first, then build against them.
    - Name components semantically with `/` folders (`Logo/Mark`, `Button/Primary`, `Model-chip/Haiku`).
    A file built this way needs no cleanup pass. `reference/05-pages-and-layers.md`.
-4. **Verify state before mutating.** `await figma.setCurrentPageAsync(page)` before reading `page.children` (otherwise it returns `[]`). Return real node ids from `use_figma` so you can screenshot them.
+4. **Verify state before mutating.** `await figma.setCurrentPageAsync(page)` before reading `page.children` (otherwise it returns `[]`). Note `use_figma` often reports **"Code executed with no return value"** even with a trailing expression — do not rely on its return. Name every node you create, then retrieve ids afterward with `get_metadata` on the parent frame (find by name). See `reference/08-gotchas.md`.
+5. **Text needs breathing room inside its container.** Never set text flush to a box edge. Either size the box to the text plus padding (measure `t.width` / `t.height` after setting `characters`, then `box.resize(t.width + 2*padX, t.height + 2*padY)`), or, for a fixed-size box, verify the **longest** label fits with margin before committing. A centered label in a fixed box silently clips or kisses the edges the moment the content is wider than you guessed. Sensible minimums: ~14-16px horizontal and ~10-12px vertical for pills/chips/buttons; more for cards. Build boxes from content, not content into boxes. (`assets/helpers.js` `pill()` does this for you.)
 
 ## Standard playbook (build-from-scratch)
 
@@ -46,7 +47,8 @@ The Figma MCP runs JavaScript against the **Figma Plugin API** (`use_figma`) and
 4. **Build, named + bound + grouped as you go.** Use a reusable helper block (`assets/helpers.js`) for `rect`, `roundedRect`, `text`, `chip`, shadows, shear bars, etc. Draw backgrounds before text (z-order = append order).
 5. `get_screenshot` the frame (real node id, `enableBase64Response: true` if you cannot fetch URLs). Read, fix, repeat.
 6. **Components**: promote repeated UI to `createComponent`; group variants with `combineAsVariants`.
-7. **Keep the file clean**: one page per purpose, delete rejected explorations as decisions land, never accumulate orphan boards.
+7. **Raster images** (screenshots, logos, photos): the sandbox has no filesystem — bring them in with `upload_assets` onto a named holder rect. `reference/09-raster-images.md`.
+8. **Keep the file clean**: one page per purpose, delete rejected explorations as decisions land, never accumulate orphan boards.
 
 ## Geometry you will need
 
@@ -62,4 +64,5 @@ Rects, ellipses, text only get you so far. For slanted/parallelogram shapes use 
 - `reference/06-screenshot-loop.md` — screenshot ids, base64 vs URL, the iteration cadence.
 - `reference/07-design-to-code.md` — reading designs + web capture + Code Connect.
 - `reference/08-gotchas.md` — the specific errors hit in practice and their fixes.
+- `reference/09-raster-images.md` — importing screenshots / logos / photos via `upload_assets`, FILL vs FIT, pre-crop, framing a screenshot.
 - `assets/helpers.js` — copy-paste helper library for `use_figma` calls.
