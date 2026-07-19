@@ -974,7 +974,7 @@ Local search. **These are the only tools that work with Fusion closed**; they ne
 fusion-cad-mcp corpus build --i-accept-autodesk-terms
 ```
 
-That writes to `~/.fusion-cad/corpus/`, which is where the server looks first. It needs the optional extras: `pip install "fusion-cad-mcp[corpus]"`. Set `FUSION_CAD_CORPUS_DIR` to keep it elsewhere.
+That writes to `~/.fusion-cad/corpus/`, which is where the server looks first. It needs the optional extras: `pip install "fusion-cad-mcp[corpus] @ git+https://github.com/Mfrostbutter/fusion-cad-mcp.git"`. Set `FUSION_CAD_CORPUS_DIR` to keep it elsewhere.
 
 Search is substring bag-of-words with hand-tuned weights, not embeddings and not BM25. There is no stemming and no word-boundary matching, so `"arc"` matches inside `"search"`. Zero hits is a success with an empty list, not an error.
 

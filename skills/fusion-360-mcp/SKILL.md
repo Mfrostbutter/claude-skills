@@ -115,12 +115,20 @@ Look the API up before writing against an unfamiliar method. `find_api` costs on
 
 ## Setup
 
+`fusion-cad-mcp` is at **https://github.com/Mfrostbutter/fusion-cad-mcp**:
+
+```bash
+pip install "fusion-cad-mcp @ git+https://github.com/Mfrostbutter/fusion-cad-mcp.git"
+```
+
+Then point your MCP client at the `fusion-cad-mcp` command. `CONNECT.md` in that repo has per-client config and troubleshooting.
+
 The server talks to Autodesk's MCP at `127.0.0.1:27182`, which is enabled in **Preferences > General > API > Fusion MCP Server**. Fusion must be running with a design open.
 
 `find_api` needs a local corpus of Autodesk's API help, which is not redistributed. Build it once:
 
 ```
-pip install "fusion-cad-mcp[corpus]"
+pip install "fusion-cad-mcp[corpus] @ git+https://github.com/Mfrostbutter/fusion-cad-mcp.git"
 fusion-cad-mcp corpus build --i-accept-autodesk-terms
 ```
 
