@@ -1,5 +1,5 @@
-﻿---
-name: fusion-360-mcp
+---
+name: fusion-cad
 description: "Use this skill whenever the user wants to do CAD work through Autodesk Fusion, either via the fusion-cad-mcp server (75 named tools: create_sketch, add_rectangle, extrude, add_hole, fillet_edges, create_joint, export, and so on) or via Autodesk's own Fusion MCP (fusion_mcp_execute, fusion_mcp_read, fusion_mcp_update, fusion_mcp_electronics_read). Covers parametric constrained sketches, extrudes, holes, fillets, chamfers, shells, multi-body modeling, assemblies and components, as-built joints, motion (hinges, sliders), print-in-place mechanisms and print orientation, exports to STL/3MF/STEP, undo/redo, screenshots, API documentation lookup, and explicit camera control. Trigger on any mention of Fusion 360, the Fusion MCP, .f3d/.f3z/.step files, parametric CAD design, building or editing 3D models programmatically, sketches, extrudes, fillets, counterbore holes, components, joints, hinges, sliders, assemblies, print-in-place parts, print orientation, or when the user asks to model a bracket, tray, mount, panel, organizer, rack mount, or any functional 3D-printed product. Use even if the user does not name the MCP explicitly: if they ask Claude to design something in Fusion or build a part, this skill applies."
 ---
 
