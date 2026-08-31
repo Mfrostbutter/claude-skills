@@ -10,3 +10,8 @@ desktop.ini
 
 # local planning notes (not for publication)
 .notes/
+
+# python
+__pycache__/
+*.pyc
+.pytest_cache/
