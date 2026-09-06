@@ -24,6 +24,8 @@ async for upd in graph.astream(state, config, stream_mode="updates"):
 
 Rule of thumb: intermediate nodes return `name=`'d messages; the finalize node returns an unnamed message (the result).
 
+- **A `report` key in a node payload** -> the structured result. The driver copies it generically (`if isinstance(payload.get("report"), dict): report = payload["report"]`), persists it as JSON, and includes it on `final`. Keep the unnamed markdown message too so prose consumers still work.
+
 ## A workable event contract
 
 If you broadcast run events over WebSocket/SSE, one discriminated event type works well:
@@ -36,7 +38,7 @@ If you broadcast run events over WebSocket/SSE, one discriminated event type wor
 | `node` | a NAMED intermediate AIMessage | `label` (= the message `name`), `text` |
 | `awaiting_approval` | `interrupt()` hit | `proposal` |
 | `resumed` | human resumed | `action` |
-| `final` | run finished | `result`, `trace_url`, tokens, cost |
+| `final` | run finished | `result`, `report` (structured dict or null), `trace_url`, tokens, cost |
 | `error` | failed | `message` |
 
 ## The live graph view

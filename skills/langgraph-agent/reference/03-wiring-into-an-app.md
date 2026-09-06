@@ -62,3 +62,19 @@ digest = build_digest_graph(_llm, _studio_effects)   # no checkpointer
 ```
 
 Studio effects should be dry-run/no-op — there are no creds in the dev server. This only works if the graph obeys the pure-factory rule (`02`).
+
+## Studio is a second registration
+
+`studio.py` builds every Studio-visible graph at module scope and `langgraph.json` names each one, so an agent lives in FOUR places: the catalog, `studio.py`, `langgraph.json`, and the docs index. Removing or renaming an agent means all four; grepping the old id across the repo (excluding `Archive/`) is the cheap check. Graphs whose effects need app-side data with no HTTP equivalent (a DB lookup) simply do not get a Studio entry.
+
+## Seed every custom state channel
+
+A key absent from the initial state is MISSING, not `None`. Nodes that do `state["workflow"]` raise `KeyError` on a fresh run. Make `initial_state` seed every custom channel the graph declares (`{"messages": [...], "triage_target": t, "workflow": None, "findings": [], "report": None}`) and prefer `state.get()` inside nodes anyway.
+
+## Starting a run from another view
+
+When a different screen wants to start an agent on ITS object (an execution id from an errors list, a workflow id from a workflow list), do not widen the `kickoff(context, prompt)` contract. Accept the external id on the route, run the pre-check that screen expects (refuse with a typed detail, e.g. `{"code": "execution_purged"}`, when the object is gone so the UI renders one state), and translate the id into the task text plus a `target` label (`exec:<id>`) before calling the driver. The agent stays agnostic; the route owns the translation.
+
+## Retiring agents: archive, never delete
+
+`git mv` the graph packages into `Archive/<date>-<reason>/`, save the removed catalog entries verbatim to a `.py.txt` next to a README that says why they left and where they live now, and drop their prompts, deps, compose mounts, and env knobs in the same commit. Ruff should already exclude `Archive/`. A test that asserts the retired ids are absent from the catalog keeps them from creeping back.

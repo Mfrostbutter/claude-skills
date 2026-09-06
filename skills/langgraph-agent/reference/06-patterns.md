@@ -73,4 +73,43 @@ Any node that classifies, selects, scores, or judges should return a pydantic mo
 
 - Cheap/fast model: triage, classify, rank, route, summarize lenses (good enough, low cost).
 - Quality model: propose a fix, write prose, anything correctness- or voice-sensitive.
-- Override per agent via an env var (e.g. `OPS_TRIAGE_MODEL`) without code changes.
+- Override per agent via an env var (e.g. `ERROR_TRIAGE_MODEL`) without code changes. Give the token cap ONE shared env var across the fleet (e.g. `LANGGRAPH_MAX_TOKENS`); a cap named after the first agent ends up governing every agent and confuses operators.
+
+## Tool-loop, then a structured report node
+
+The UI wants fields (severity, category, root cause, fix, next steps), but forcing the investigation loop to emit JSON degrades the investigation and the timeline. Keep the loop in prose and add ONE terminal node:
+
+```
+START -> agent <-> tools -> report -> END
+```
+
+```python
+def _after_agent(state):
+    return "tools" if tools_condition(state) == "tools" else "report"
+
+async def _report(state):
+    diagnosis = _last_unnamed_ai_text(state["messages"])
+    try:
+        rep = await llm.with_structured_output(TriageReport).ainvoke(
+            [SystemMessage(REPORT_PROMPT), HumanMessage("Triage diagnosis:\n\n" + diagnosis)])
+    except Exception:
+        return {"report": None}                  # the prose stands
+    return {"report": rep.model_dump(), "messages": [AIMessage(content=render_md(rep))]}
+```
+
+- `report` is a plain `Optional[dict]` state channel. Make it generic: the driver copies `node_payload["report"]` whenever a node sets a dict, so any graph (an auditor, a reviewer) can adopt the same channel without driver changes.
+- The report prompt says "use only what the diagnosis says; do not invent ids or counts" and where to put unknowns (empty id, `node_name='unknown'`). Structured output happily fills gaps with plausible strings otherwise.
+- Match the schema's field names to an existing renderer if one exists. Two runtimes producing the same shape means one renderer and one contract test (assert the field set).
+- The rendered markdown is the run's final unnamed message, so the timeline UI and the run record still work for a prose-only consumer.
+
+## Static checks, then rank
+
+For "evaluate this artifact" agents (an n8n workflow, a config, a manifest), the model is the wrong place to FIND problems: it misses structural facts and invents others. Split it:
+
+1. **`checks.py`, pure python.** One function per check over the raw artifact dict, returning `Finding(check, severity, node, message, fix)`. A `run_checks()` that sorts by severity, a `score()` that weights them, and a `digest()` that renders names, types, and flags but NEVER parameter values.
+2. **Graph `resolve -> check -> assess`.** `resolve` turns the run target into the artifact through an injected op; `check` runs the checks and posts a tally as a named message; `assess` gives the model the digest plus the findings and asks for a ranked report via structured output. Prompt: rank and explain, merge duplicates, do not invent findings the checks did not surface, move the score by at most N points.
+3. **Fallback without a model.** `report_from_findings(findings)` builds the same report shape from the static layer, so the agent still returns a scored result when the model is down.
+
+Secrets discipline: a check that flags a literal secret must name the parameter PATH, never quote the value, because finding messages reach the model and the run log. The digest omits values for the same reason. Test both with a fake secret and assert it appears nowhere in the prompt or the report.
+
+Static evaluation is the realistic first version. Behavioral evaluation (run the artifact with fixtures and judge the output) needs a sandbox and is a separate agent.

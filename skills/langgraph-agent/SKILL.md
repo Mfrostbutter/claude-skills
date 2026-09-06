@@ -7,7 +7,8 @@ description: >-
   a graph importable from LangGraph Studio, or structure agents so one driver can
   run many. Encodes the LangGraph 1.x API, the pure-factory + injected-effects
   pattern, interrupt/resume HITL, streaming + topology for a live view, the
-  two-model pattern, testing with stub models, and the dependency pins. Triggers
+  two-model pattern, a structured report node after a tool loop, static checks
+  then a ranking pass, testing with stub models, and the dependency pins. Triggers
   include "build a LangGraph agent", "author a graph", "wire human-in-the-loop",
   "make it importable in Studio", "the run won't stream / won't pause".
 ---
@@ -66,12 +67,22 @@ Drive `graph.astream(..., stream_mode="updates")` and map each node update to yo
 - **Cross-provider reviewer:** a different vendor's model judges the primary's output before it acts.
 - **Grounding fact-check:** ground concrete claims against the source text (not the model's memory) before the human sees the draft; bound the auto-revision loop.
 - **Structured output:** `llm.with_structured_output(PydanticModel)` for selection/assessment/verdict nodes. Validation + retry happen for you.
+- **Tool-loop, then a report node:** let the loop write prose, then ONE terminal node structures it into a pydantic report on a generic `report` state channel. Prose survives if structuring fails.
+- **Static checks, then rank:** deterministic pure-python checks find the findings; the model only ranks, explains, and writes fixes from a values-free digest. Unit-test the checks with no model at all.
 
 More: `reference/06-patterns.md`.
 
+## Structured results the app can render
+
+When a UI needs fields (severity, category, a fix per finding) and not markdown, do NOT make the tool loop emit JSON. Keep the loop in prose, add a terminal `report` node that calls `with_structured_output(Report)` on the last prose message, and return BOTH `{"report": rep.model_dump()}` and an unnamed `AIMessage(render_md(rep))`. The driver reads `report` off the node payload generically (any graph can set it), persists it as JSON, and puts it on the `final` event. On any structuring failure return `{"report": None}` so the prose stands. Match the report's field names to whatever renderer already exists so one renderer serves every producer. Details: `reference/06-patterns.md`.
+
+## Curating a fleet
+
+A fleet drifts toward demo agents. Before shipping, ask of each agent: does it operate on the product's objects, and is its output something the product's UI renders? Archive the rest (`git mv` into `Archive/<date>-<why>/`, keep the removed catalog entries as a text file next to a README) and rename survivors in product voice. Removing an agent touches four places, not one: the catalog, `studio.py`, `langgraph.json`, and the docs index. The agent-agnostic driver, routes, storage, and UI should need zero edits; if they do, that is the real finding. Details: `reference/03-wiring-into-an-app.md`.
+
 ## Test before you wire the UI
 
-Stand up a matched venv (the pins above), then drive the graph headless with **stub models + real (or no-op) effects** through the interrupt and a resume. You do not need an API key to prove topology, streaming, the pause, and staging. Then `py_compile`, then run it in the app. Harness + venv recipe: `reference/07-testing.md`.
+Stand up a matched venv (the pins above), then drive the graph headless with **stub models + real (or no-op) effects** through the interrupt and a resume. You do not need an API key to prove topology, streaming, the pause, and staging. For a ReAct loop, a duck-typed fake model (`bind_tools` returns self, scripted `ainvoke` turns, scripted `with_structured_output`) drives the real `ToolNode` and real tools. Guard graph tests with `pytest.importorskip("langgraph")` when the extra is optional in CI. Then `py_compile`, then run it in the app. Harness + venv recipe: `reference/07-testing.md`.
 
 ## Prompt hygiene in agents
 
@@ -85,6 +96,6 @@ Stand up a matched venv (the pins above), then drive the graph headless with **s
 - `reference/03-wiring-into-an-app.md` — turning a graph into a runnable, catalogued agent + Studio.
 - `reference/04-hitl.md` — interrupt/resume, multi-gate, the driver's park/resume job.
 - `reference/05-streaming-and-observability.md` — streaming to a UI, topology, LangSmith.
-- `reference/06-patterns.md` — the graph shapes with when-to-use.
+- `reference/06-patterns.md` — the graph shapes with when-to-use, including tool-loop + report node and static-checks + rank.
 - `reference/07-testing.md` — stub models, drive-to-interrupt, the async gotcha.
 - `assets/new_agent_template.py` — a HITL two-model pure-factory skeleton.

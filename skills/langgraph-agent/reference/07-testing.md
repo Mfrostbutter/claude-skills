@@ -75,3 +75,40 @@ s3 = await graph.ainvoke(Command(resume={"action": "approve", "mode": "dry_run"}
 ## Dependency gaps
 
 If the agent imports something your runtime lacks (`psycopg2`, `langchain-openai`), either add it to your deps and reinstall, OR import it lazily and fail open. Prefer lazy + fail-open for anything non-essential so a missing dep degrades instead of crashing.
+
+## Fake chat model for a ReAct loop
+
+A tool loop only ever calls three things on the model: `bind_tools(tools)` (returns the bound model), `ainvoke(messages)` (one AI turn), and `with_structured_output(schema)` (a runnable whose `ainvoke` returns the object). A duck-typed fake covers all three and drives the REAL `ToolNode` and real tools, so the test proves routing, tool execution, and the report node with no key:
+
+```python
+class _Structured:
+    def __init__(self, result): self._result = result
+    async def ainvoke(self, messages):
+        if isinstance(self._result, Exception): raise self._result
+        return self._result
+
+class FakeLLM:
+    def __init__(self, turns, report): self._turns = list(turns); self._report = report
+    def bind_tools(self, tools): return self
+    async def ainvoke(self, messages): return self._turns.pop(0)
+    def with_structured_output(self, schema): return _Structured(self._report)
+
+turns = [
+    AIMessage(content="", tool_calls=[{"name": "get_execution", "args": {"execution_id": "42"}, "id": "c1"}]),
+    AIMessage(content="## Triage: prose diagnosis"),
+]
+graph = build_graph(FakeLLM(turns, TriageReport(...)), [get_execution])
+final = await graph.ainvoke({"messages": [HumanMessage("Triage execution 42.")], "triage_target": "exec:42"})
+```
+
+Pass an `Exception` as the structured result to test the prose-only fallback. No `BaseChatModel` subclass, no `FakeListChatModel`: those fight `bind_tools`.
+
+## Optional extra in CI
+
+When `langgraph` is an optional extra the CI job does not install, put `pytest.importorskip("langgraph")` at the top of every graph test (or in a helper the tests call) and keep the catalog, schema, storage, and route tests import-free so they run everywhere. Install the extra in the local venv so the graph tests actually run at least there.
+
+## Catalog and route tests that survive boot
+
+- Other modules may register their own agents into the catalog at import time. Assert your curated ids are a PREFIX of the catalog (and that retired ids are absent), not that they exhaust it.
+- To test a "start a run" route without a model, `monkeypatch.setattr(runner, "run", fake)` where `fake` records `(run_id, agent_id, error_id, prompt)`, and monkeypatch the pre-check (e.g. the n8n `get_execution`) to return a live or missing object for each branch.
+- The driver's stream loop can be tested with a fake graph whose `astream()` returns an async iterator of `{node: payload}` dicts (plus an `aclose()`); assert the `final_md` and `report` it extracts.
