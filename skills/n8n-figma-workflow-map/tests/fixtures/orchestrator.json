@@ -1,0 +1,23 @@
+{
+  "id": "wf-orch",
+  "name": "orders: Nightly Sync",
+  "active": true,
+  "nodes": [
+    { "name": "Intake zone", "type": "n8n-nodes-base.stickyNote", "position": [0, 0], "parameters": { "content": "## Intake\nTwo entry points share one path. The webhook exists so ops can rerun a night.", "width": 400, "height": 600 } },
+    { "name": "Enrich zone", "type": "n8n-nodes-base.stickyNote", "position": [500, 0], "parameters": { "content": "## Enrich", "width": 400, "height": 600 } },
+    { "name": "Store zone", "type": "n8n-nodes-base.stickyNote", "position": [1000, 0], "parameters": { "content": "## Store\nOne write per run.", "width": 400, "height": 600 } },
+    { "name": "Nightly", "type": "n8n-nodes-base.scheduleTrigger", "position": [100, 100], "parameters": { "rule": { "interval": [{ "field": "cronExpression", "expression": "0 2 * * *" }] } } },
+    { "name": "Rerun webhook", "type": "n8n-nodes-base.webhook", "position": [100, 300], "parameters": { "httpMethod": "POST", "path": "orders/rerun" } },
+    { "name": "Load orders", "type": "n8n-nodes-base.postgres", "position": [300, 200], "parameters": { "operation": "executeQuery", "query": "SELECT o.* FROM sales.orders o JOIN sales.customers c ON c.id = o.customer_id WHERE o.day = current_date - 1" } },
+    { "name": "Enrich orders", "type": "n8n-nodes-base.executeWorkflow", "position": [600, 200], "parameters": { "workflowId": { "__rl": true, "value": "wf-sub", "mode": "list", "cachedResultName": "orders: Enrich" } } },
+    { "name": "Legacy export", "type": "n8n-nodes-base.executeWorkflow", "position": [600, 400], "parameters": { "workflowId": "wf-gone" } },
+    { "name": "Save facts", "type": "n8n-nodes-base.postgres", "position": [1100, 200], "parameters": { "operation": "executeQuery", "query": "-- nightly upsert\nINSERT INTO sales.order_facts (day, total) VALUES ($1, $2) ON CONFLICT (day) DO UPDATE SET total = excluded.total" } }
+  ],
+  "connections": {
+    "Nightly": { "main": [[{ "node": "Load orders", "type": "main", "index": 0 }]] },
+    "Rerun webhook": { "main": [[{ "node": "Load orders", "type": "main", "index": 0 }]] },
+    "Load orders": { "main": [[{ "node": "Enrich orders", "type": "main", "index": 0 }]] },
+    "Enrich orders": { "main": [[{ "node": "Legacy export", "type": "main", "index": 0 }]] },
+    "Legacy export": { "main": [[{ "node": "Save facts", "type": "main", "index": 0 }]] }
+  }
+}

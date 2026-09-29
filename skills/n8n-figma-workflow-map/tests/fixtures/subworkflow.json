@@ -1,0 +1,14 @@
+{
+  "id": "wf-sub",
+  "name": "orders: Enrich",
+  "active": true,
+  "nodes": [
+    { "name": "Called", "type": "n8n-nodes-base.executeWorkflowTrigger", "position": [0, 0], "parameters": {} },
+    { "name": "Fetch rates", "type": "n8n-nodes-base.httpRequest", "position": [200, 0], "parameters": { "method": "GET", "url": "https://api.example.com/rates" } },
+    { "name": "Apply rates", "type": "n8n-nodes-base.code", "position": [400, 0], "parameters": { "jsCode": "return $input.all();" } }
+  ],
+  "connections": {
+    "Called": { "main": [[{ "node": "Fetch rates", "type": "main", "index": 0 }]] },
+    "Fetch rates": { "main": [[{ "node": "Apply rates", "type": "main", "index": 0 }]] }
+  }
+}

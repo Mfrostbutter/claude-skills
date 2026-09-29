@@ -1,0 +1,28 @@
+[
+  {
+    "id": "wf-health",
+    "name": "orders: Health Check",
+    "active": false,
+    "nodes": [
+      { "name": "Every 5 min", "type": "n8n-nodes-base.scheduleTrigger", "position": [0, 0], "parameters": { "rule": { "interval": [{ "field": "minutes", "minutesInterval": 5 }] } } },
+      { "name": "Count recent", "type": "n8n-nodes-base.postgres", "position": [200, 0], "parameters": { "operation": "executeQuery", "query": "WITH recent AS (SELECT * FROM sales.orders WHERE created_at > now() - interval '1 hour') SELECT count(*) FROM recent, generate_series(1, 2)" } },
+      { "name": "Evaluate", "type": "n8n-nodes-base.code", "position": [400, 0], "parameters": {}, "disabled": true }
+    ],
+    "connections": {
+      "Every 5 min": { "main": [[{ "node": "Count recent", "type": "main", "index": 0 }]] },
+      "Count recent": { "main": [[{ "node": "Evaluate", "type": "main", "index": 0 }]] }
+    }
+  },
+  {
+    "id": "wf-digest",
+    "name": "orders: Weekly Digest",
+    "active": true,
+    "nodes": [
+      { "name": "Mondays", "type": "n8n-nodes-base.scheduleTrigger", "position": [0, 0], "parameters": { "rule": { "interval": [{ "field": "weeks", "triggerAtHour": 8 }] } } },
+      { "name": "Read facts", "type": "n8n-nodes-base.postgres", "position": [200, 0], "parameters": { "operation": "select", "schema": { "value": "sales" }, "table": { "value": "order_facts" } } }
+    ],
+    "connections": {
+      "Mondays": { "main": [[{ "node": "Read facts", "type": "main", "index": 0 }]] }
+    }
+  }
+]
