@@ -42,7 +42,7 @@ The Figma MCP runs JavaScript against the **Figma Plugin API** (`use_figma`) and
 ## Standard playbook (build-from-scratch)
 
 1. `whoami` → account + `planKey`. `create_new_file` if needed → capture `fileKey`.
-2. **Foundations first.** Create paint / text / effect styles (guard by name to avoid duplicates). This locks the palette + type ramp and makes step 4 bindable. `reference/04-styles-and-components.md`.
+2. **Foundations first.** Create paint / text / effect styles (guard by name to avoid duplicates). This locks the palette + type ramp and makes step 4 bindable. `reference/04-styles-and-components.md`. If the work belongs to a known brand, start from its profile (`reference/10-brand-n8n-itl.md` for n8n In The Loop material) instead of inventing a palette.
 3. **Discover fonts** you intend to use with `listAvailableFontsAsync` filtered to your candidates; record exact style names (they vary: `Semi Bold` vs `SemiBold`). `loadFontAsync` all of them up front.
 4. **Build, named + bound + grouped as you go.** Use a reusable helper block (`assets/helpers.js`) for `rect`, `roundedRect`, `text`, `chip`, shadows, shear bars, etc. Draw backgrounds before text (z-order = append order).
 5. `get_screenshot` the frame (real node id, `enableBase64Response: true` if you cannot fetch URLs). Read, fix, repeat.
@@ -65,4 +65,5 @@ Rects, ellipses, text only get you so far. For slanted/parallelogram shapes use 
 - `reference/07-design-to-code.md` — reading designs + web capture + Code Connect.
 - `reference/08-gotchas.md` — the specific errors hit in practice and their fixes.
 - `reference/09-raster-images.md` — importing screenshots / logos / photos via `upload_assets`, FILL vs FIT, pre-crop, framing a screenshot.
+- `reference/10-brand-n8n-itl.md` — the n8n In The Loop presentation language: black / white / pink palette, Zalando Sans (Inter as twin), type ramp, composition rules. Load it for anything that sits next to an ITL deck; `assets/helpers.js` has `N8N` + `n8nStyles()`.
 - `assets/helpers.js` — copy-paste helper library for `use_figma` calls.

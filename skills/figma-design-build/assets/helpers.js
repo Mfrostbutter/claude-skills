@@ -58,3 +58,16 @@ function twoTone(p,x,y,chars,splitAt,family,style,size,baseHex,accentHex,opts){c
 function paintStyle(name,hex){let s=figma.getLocalPaintStyles().find(p=>p.name===name);if(!s){s=figma.createPaintStyle();s.name=name;s.paints=fl(hex);}return s.id;}
 function textStyle(name,family,st,size,lhPct,trPct){let s=figma.getLocalTextStyles().find(t=>t.name===name);if(!s){s=figma.createTextStyle();s.name=name;s.fontName={family,style:st};s.fontSize=size;s.lineHeight={value:lhPct,unit:"PERCENT"};s.letterSpacing={value:trPct,unit:"PERCENT"};}return s.id;}
 function effectStyle(name,effects){let s=figma.getLocalEffectStyles().find(e=>e.name===name);if(!s){s=figma.createEffectStyle();s.name=name;s.effects=effects;}return s.id;}
+
+// ---- n8n In The Loop brand (reference/10-brand-n8n-itl.md) ----
+// Three colours plus two greys; one typeface. Call n8nStyles() once per file,
+// then bind with fillStyleId / textStyleId from the maps it returns.
+const N8N={ink:"1A1A1A",text:"000000",white:"FFFFFF",panel:"F4F4F4",pink:"F28CA8",pinkDeep:"EA4B71",pinkPale:"FBD7E1",grey:"6B6B6B",greyOnDark:"C9C9C9"};
+// family/styles: pass what listAvailableFontsAsync returned (Zalando Sans if present, else Inter).
+async function n8nStyles(family,boldStyle,regularStyle){
+  family=family||"Inter";boldStyle=boldStyle||"Bold";regularStyle=regularStyle||"Regular";
+  await figma.loadFontAsync({family,style:boldStyle});await figma.loadFontAsync({family,style:regularStyle});
+  const P={};[["ink/black",N8N.ink],["ink/text",N8N.text],["paper/white",N8N.white],["paper/panel",N8N.panel],["pink/accent",N8N.pink],["pink/deep",N8N.pinkDeep],["pink/pale",N8N.pinkPale],["grey/caption",N8N.grey],["grey/on-dark",N8N.greyOnDark]].forEach(([n,h])=>{P[n]=paintStyle(n,h);});
+  const T={};[["display/number",boldStyle,160,90],["display/title",boldStyle,72,95],["heading/large",boldStyle,44,100],["heading/medium",boldStyle,30,105],["heading/small",boldStyle,22,110],["body",regularStyle,20,125],["caption",regularStyle,15,120]].forEach(([n,st,sz,lh])=>{T[n]=textStyle(n,family,st,sz,lh,0);});
+  return {P,T};
+}
