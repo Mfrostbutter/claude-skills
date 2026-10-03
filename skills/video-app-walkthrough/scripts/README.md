@@ -12,4 +12,4 @@ Copy this folder's contents into `<workdir>\<slug>\scripts\` (and `build_comp.js
 | `build_comp.jsx` | builds the AE comp and queues the render | `CONFIG` block (colours, fonts, pads, comp name) |
 | `run_pipeline.sh` | AE build + aerender driver | AE path if the version changes |
 
-Python deps: `playwright`, `httpx`, `asyncpg` (only for the DB census), `python-dotenv`. Use the app's own venv when it has one.
+Python deps: `playwright`, `httpx`, `asyncpg` (only for the DB census). Use the app's own venv when it has one.
