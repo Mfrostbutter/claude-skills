@@ -1,41 +1,33 @@
-"""Record one clip per walkthrough scene from the local app with Playwright.
+"""Record one clip per admin-walkthrough scene from the local app with Playwright.
 
 Each scene gets its own browser context so Playwright writes one .webm per
 scene; ffmpeg then turns each into an H.264 .mp4 that After Effects imports.
-A fake cursor is injected so clicks and typing read on camera.
+A fake cursor is injected so clicks and typing read on camera. Beats are
+fractions of the scene's VO duration (read from vo/manifest.json), so the
+on-screen action lands on the words that name it.
 
-IN: running app at BASE, record ids via env APP_RECORD / APP_PARENT (else the newest matching row from the DB).
+IN: running app at BASE, vo/manifest.json. Scene ids on argv limit the run.
 OUT: captures/scene_NN.mp4 and captures/clips.json with measured durations.
 """
-import asyncio
 import json
-import os
-import re
-import shutil
 import subprocess
 import sys
 import time
 from pathlib import Path
 
-import asyncpg
 from playwright.sync_api import sync_playwright
 
 BASE = os.environ.get("APP_BASE", "http://127.0.0.1:8000")
 HERE = Path(__file__).resolve().parent
-CAP = HERE.parent / "captures"
+ROOT = HERE.parent
+CAP = ROOT / "captures"
 RAW = CAP / "raw"
 FFMPEG = os.environ.get("FFMPEG", "ffmpeg")
 FFPROBE = os.environ.get("FFPROBE", "ffprobe")
-DB = os.environ.get("APP_DB_URL", "")  # only for ids_from_db()
 W, H = 1920, 1080
+VO_LEAD, TAIL = 0.6, 3.0  # VO starts 0.6 s into the scene in the comp; hold 3 s past its end
 
-# fallback hold per scene (seconds) when vo/manifest.json does not exist yet; VO + 3 s wins when it does
-MIN_LEN = {"02": 28, "03": 34, "04": 16, "05": 31, "06": 36, "07": 26, "08": 28, "09": 16}
-VO_MANIFEST = HERE.parent / "vo" / "manifest.json"
-if VO_MANIFEST.exists():
-    for _s in json.loads(VO_MANIFEST.read_text(encoding="utf-8"))["scenes"]:
-        if _s["id"] in MIN_LEN:
-            MIN_LEN[_s["id"]] = max(MIN_LEN[_s["id"]], float(_s["duration"]) + 3.0)
+VO = {s["id"]: s["duration"] for s in json.loads((ROOT / "vo" / "manifest.json").read_text(encoding="utf-8"))["scenes"]}
 
 CURSOR_JS = """
 (() => {
@@ -52,52 +44,50 @@ CURSOR_JS = """
 })();
 """
 
-AP_ANSWER = ("Most of the pain is intake. About 1,400 supplier invoices a month and seventy percent land as PDFs "
-             "in a shared Outlook mailbox. A specialist opens each one, keys the header into NetSuite, and if it "
-             "does not match the Coupa PO it goes into an Excel exceptions tracker as well. Same data typed twice.")
+
+class Scene:
+    """Timing helpers bound to one recording: beats as fractions of the VO."""
+
+    def __init__(self, page, sid: str):
+        self.page, self.t0, self.vo = page, time.time(), VO[sid]
+
+    def at(self, frac: float):
+        t = VO_LEAD + frac * self.vo
+        rem = t - (time.time() - self.t0)
+        if rem > 0:
+            self.page.wait_for_timeout(int(rem * 1000))
+
+    def glide(self, x: int, y: int, steps: int = 28):
+        self.page.mouse.move(x, y, steps=steps)
+        self.page.wait_for_timeout(250)
+
+    def glide_to(self, sel: str, dx: int = 24):
+        box = self.page.locator(sel).first.bounding_box()
+        if box:
+            self.glide(int(box["x"] + min(dx, box["width"] / 2)), int(box["y"] + box["height"] / 2))
+
+    def scroll_to(self, sel: str, wait: float = 1.4, block: str = "start"):
+        loc = self.page.locator(sel).first
+        if loc.count():
+            loc.evaluate("(el, b) => el.scrollIntoView({behavior: 'smooth', block: b})", block)
+            self.page.wait_for_timeout(int(wait * 1000))
+
+    def wheel_in(self, sel: str, dy: int, wait: float = 1.2):
+        self.glide_to(sel, dx=400)
+        self.page.mouse.wheel(0, dy)
+        self.page.wait_for_timeout(int(wait * 1000))
+
+    def click(self, sel: str):
+        self.glide_to(sel)
+        self.page.locator(sel).first.click()
+
+    def hold_min(self):
+        rem = VO_LEAD + self.vo + TAIL - (time.time() - self.t0)
+        if rem > 0:
+            self.page.wait_for_timeout(int(rem * 1000))
 
 
-def ids_from_db() -> tuple[str, str]:
-    async def q():
-        c = await asyncpg.connect(DB, timeout=5)
-        row = await c.fetchrow(
-            "SELECT id, engagement_id FROM interviews WHERE business_unit = 'Accounts payable' "
-            "AND status = 'completed' ORDER BY completed_at DESC LIMIT 1")
-        await c.close()
-        return row
-    row = asyncio.run(q())
-    if not row:
-        sys.exit("no completed Accounts payable interview in the DB")
-    return str(row["id"]), str(row["engagement_id"])
-
-
-def smooth_scroll(page, y: int, wait: float = 1.6):
-    page.evaluate("y => window.scrollTo({top: y, behavior: 'smooth'})", y)
-    page.wait_for_timeout(int(wait * 1000))
-
-
-def scroll_to(page, selector: str, wait: float = 1.6, block: str = "start"):
-    loc = page.locator(selector).first
-    if loc.count():
-        loc.evaluate("(el, b) => el.scrollIntoView({behavior: 'smooth', block: b})", block)
-        page.wait_for_timeout(int(wait * 1000))
-        return True
-    return False
-
-
-def glide(page, x: int, y: int, steps: int = 28):
-    page.mouse.move(x, y, steps=steps)
-    page.wait_for_timeout(250)
-
-
-def hold(page, t0: float, scene: str):
-    remaining = MIN_LEN[scene] - (time.time() - t0)
-    if remaining > 0:
-        page.wait_for_timeout(int(remaining * 1000))
-
-
-def record(pw, scene: str, fn):
-    """Run fn(page) in a fresh recording context; return the raw webm path."""
+def record(pw, sid: str, fn):
     browser = pw.chromium.launch(channel="chromium", headless=True)
     ctx = browser.new_context(viewport={"width": W, "height": H}, device_scale_factor=1,
                               record_video_dir=str(RAW), record_video_size={"width": W, "height": H},
@@ -105,21 +95,21 @@ def record(pw, scene: str, fn):
     ctx.add_init_script(CURSOR_JS)
     page = ctx.new_page()
     page.set_default_timeout(60_000)
-    t0 = time.time()
+    page.mouse.move(1180, 620)
+    sc = Scene(page, sid)
     try:
-        page.mouse.move(1180, 620)  # park the cursor mid-frame instead of the top-left corner
-        fn(page)
-        hold(page, t0, scene)
+        fn(sc)
+        sc.hold_min()
     finally:
         video = page.video
         ctx.close()
         browser.close()
     src = Path(video.path())
-    dst = RAW / f"scene_{scene}.webm"
+    dst = RAW / f"scene_{sid}.webm"
     if dst.exists():
         dst.unlink()
     src.rename(dst)
-    print(f"  scene {scene}: {time.time() - t0:.0f}s -> {dst.name}", flush=True)
+    print(f"  scene {sid}: {time.time() - sc.t0:.0f}s -> {dst.name}", flush=True)
     return dst
 
 
@@ -127,7 +117,7 @@ def to_mp4(src: Path) -> Path:
     dst = CAP / (src.stem + ".mp4")
     subprocess.run([FFMPEG, "-y", "-loglevel", "error", "-i", str(src), "-r", "30",
                     "-c:v", "libx264", "-preset", "slow", "-crf", "17", "-pix_fmt", "yuv420p",
-                    "-vf", f"scale={W}:{H}:flags=lanczos,format=yuv420p", "-an", str(dst)], check=True)
+                    "-vf", "scale=1920:1080:flags=lanczos", "-an", str(dst)], check=True)
     return dst
 
 
@@ -137,174 +127,206 @@ def duration(path: Path) -> float:
     return float(out)
 
 
+H2 = "h2:has-text('{}')"
+
+
+# ---- scenes ----
+
+def s02_map(sc):
+    sc.page.goto(f"{BASE}/admin"); sc.page.wait_for_timeout(1200)
+    sc.at(0.08); sc.glide(700, 330)
+    sc.at(0.40); sc.scroll_to("p.muted.small:has(a[href='/admin/coverage'])", block="center")
+    sc.at(0.48); sc.glide_to("a[href='/admin/coverage']")
+    sc.at(0.56); sc.glide_to("a[href='/admin/review']")
+    sc.at(0.62); sc.glide_to("a[href='/admin/review/outcomes']")
+    sc.at(0.68); sc.glide_to("a[href='/admin/retention']")
+    sc.at(0.74); sc.glide_to("a[href='/admin/audit']")
+    sc.at(0.86); sc.scroll_to(H2.format("New interview link"), block="start")
+
+
+def s03_mint(sc):
+    p = sc.page
+    p.goto(f"{BASE}/admin"); p.wait_for_timeout(800)
+    sc.scroll_to(H2.format("New interview link"))
+    sc.at(0.18); sc.click("input[name=respondent_name]"); p.type("input[name=respondent_name]", "Jordan Lee", delay=65)
+    sc.at(0.27); sc.click("input[name=respondent_role]"); p.type("input[name=respondent_role]", "Controller", delay=60)
+    sc.at(0.34); sc.click("input[name=respondent_department]"); p.type("input[name=respondent_department]", "Finance", delay=60)
+    sc.at(0.41); sc.glide_to("form[action='/admin/tokens'] select[name=track]"); p.select_option("form[action='/admin/tokens'] select[name=track]", "roleplay")
+    sc.at(0.47); sc.click("input[name=business_unit]"); p.type("input[name=business_unit]", "General ledger and close", delay=55)
+    p.select_option("form[action='/admin/tokens'] select[name=org_size_band]", "250-2000")
+    sc.at(0.55); sc.glide_to("form[action='/admin/tokens'] button")
+    sc.at(0.58)
+    with p.expect_navigation():
+        p.locator("form[action='/admin/tokens'] button").click()
+    p.wait_for_timeout(600)
+    sc.at(0.70); sc.glide_to("code", dx=120)
+
+
+def s04_models(sc):
+    p = sc.page
+    p.goto(f"{BASE}/admin"); p.wait_for_timeout(800)
+    sc.scroll_to(H2.format("Models per engagement"))
+    sc.at(0.12); sc.glide_to("select[name=interview_model]")
+    sc.at(0.22); sc.glide_to("select[name=extraction_model]")
+    sc.at(0.60); p.select_option("select[name=extraction_model]", "deepseek/deepseek-v4.1-flash")
+    sc.at(0.68); sc.glide_to("form[action$='/models'] button")
+    sc.at(0.72)
+    with p.expect_navigation():
+        p.locator("form[action$='/models'] button").click()
+    p.wait_for_timeout(900)
+    sc.scroll_to(H2.format("Models per engagement"))
+    sc.glide_to("select[name=extraction_model]")
+
+
+def s05_caps(sc):
+    p = sc.page
+    p.goto(f"{BASE}/admin"); p.wait_for_timeout(800)
+    sc.scroll_to(H2.format("Spend caps per engagement"))
+    sc.at(0.12); sc.glide_to("input[name=spend_cap_usd]")
+    sc.at(0.26); sc.glide_to("input[name=turn_cap_per_token]")
+    sc.at(0.40); sc.glide_to("input[name=spend_cap_usd]")
+    sc.at(0.58); sc.glide_to("section:has(h2:has-text('Spend caps')) .muted, section:has(h2:has-text('Spend caps')) p", dx=200)
+    sc.at(0.80); sc.click("input[name=spend_cap_usd]"); p.fill("input[name=spend_cap_usd]", ""); p.type("input[name=spend_cap_usd]", "40", delay=90)
+    sc.at(0.90); sc.glide_to("form[action$='/caps'] button")
+    with p.expect_navigation():
+        p.locator("form[action$='/caps'] button").click()
+    p.wait_for_timeout(800)
+    sc.scroll_to(H2.format("Spend caps per engagement"))
+
+
+def s06_prompt(sc):
+    p = sc.page
+    p.goto(f"{BASE}/admin"); p.wait_for_timeout(800)
+    sc.scroll_to(H2.format("Interviewer prompt"))
+    sc.at(0.10); sc.wheel_in("form[action='/admin/prompts'] textarea", 300, wait=1.0)
+    sc.at(0.30); sc.scroll_to(H2.format("Interviewer prompt")); sc.glide_to("section:has(h2:has-text('Interviewer prompt')) table tbody tr:nth-child(1) td:nth-child(1)")
+    sc.at(0.45); sc.glide_to("section:has(h2:has-text('Interviewer prompt')) table tbody tr:nth-child(2) td:nth-child(1)")
+    sc.at(0.55); sc.glide_to("section:has(h2:has-text('Interviewer prompt')) form[action*='/activate'] button")
+    sc.at(0.60)
+    with p.expect_navigation():
+        p.locator("section:has(h2:has-text('Interviewer prompt')) form[action*='/activate'] button").first.click()
+    p.wait_for_timeout(800)
+    sc.scroll_to(H2.format("Interviewer prompt"))
+    sc.glide_to("section:has(h2:has-text('Interviewer prompt')) table tbody tr:nth-child(2) td:nth-child(3)")
+
+
+def s07_question_set(sc):
+    p = sc.page
+    p.goto(f"{BASE}/admin"); p.wait_for_timeout(800)
+    sc.scroll_to(H2.format("Question set"))
+    sc.at(0.12); sc.wheel_in("form[action='/admin/question-set'] textarea", 420, wait=1.4)
+    sc.at(0.32); p.mouse.wheel(0, 420); p.wait_for_timeout(1000)
+    sc.at(0.46); sc.glide_to("form[action='/admin/question-set'] button")
+    sc.at(0.50)
+    with p.expect_navigation():
+        p.locator("form[action='/admin/question-set'] button").click()
+    p.wait_for_timeout(600)
+    sc.glide(700, 250)
+    sc.at(0.72); sc.scroll_to(H2.format("Question set"))
+
+
+def s08_profile(sc):
+    p = sc.page
+    p.goto(f"{BASE}/admin"); p.wait_for_timeout(800)
+    sc.scroll_to(H2.format("Platform profile"))
+    sc.at(0.10); sc.wheel_in("form[action='/admin/platform-profile'] textarea", 420, wait=1.4)
+    sc.at(0.32); p.mouse.wheel(0, 480); p.wait_for_timeout(1000)
+    sc.at(0.55); p.mouse.wheel(0, 480); p.wait_for_timeout(1000)
+    sc.at(0.72); sc.glide_to("form[action='/admin/platform-profile'] button")
+    sc.at(0.76)
+    with p.expect_navigation():
+        p.locator("form[action='/admin/platform-profile'] button").click()
+    p.wait_for_timeout(600)
+    sc.glide(700, 250)
+
+
+def s09_history(sc):
+    p = sc.page
+    p.goto(f"{BASE}/admin/instrument/question_set"); p.wait_for_timeout(1000)
+    sc.at(0.14); sc.glide_to("table.table tbody tr:nth-child(1) td:nth-child(1)")
+    sc.at(0.24); sc.glide_to("table.table tbody tr:nth-child(1) td:nth-child(3)")
+    sc.at(0.42); sc.click("a[href='/admin/instrument/question_set?v=1']")
+    p.wait_for_timeout(800)
+    sc.at(0.50); sc.scroll_to("pre.diff", block="start"); sc.glide(760, 600)
+    sc.at(0.74); sc.scroll_to("table.table"); sc.glide_to("form[action$='/1/restore'] button")
+    sc.at(0.80)
+    with p.expect_navigation():
+        p.locator("form[action$='/1/restore'] button").click()
+    p.wait_for_timeout(800)
+    sc.glide_to("table.table tbody tr:nth-child(1) td:nth-child(1)")
+
+
+def s10_coverage(sc):
+    p = sc.page
+    p.goto(f"{BASE}/admin/coverage"); p.wait_for_timeout(1000)
+    sc.at(0.10); sc.glide_to("table thead th:nth-child(3)")
+    sc.at(0.22); sc.glide_to("table thead th:nth-child(6)")
+    sc.at(0.32); sc.glide_to("table thead th:nth-child(8)")
+    sc.at(0.42); sc.glide_to("table thead th:nth-child(11)")
+    sc.at(0.56); sc.glide_to("a[href='/admin/coverage.csv']")
+    sc.at(0.78); sc.glide_to("table tbody tr:nth-child(1) td:nth-child(3)")
+
+
+def s11_review(sc):
+    p = sc.page
+    p.goto(f"{BASE}/admin/review"); p.wait_for_timeout(1000)
+    sc.at(0.10); sc.glide(760, 420)
+    sc.at(0.40); sc.glide(760, 560)
+    sc.at(0.62); p.goto(f"{BASE}/admin/review/outcomes"); p.wait_for_timeout(900)
+    sc.at(0.72); sc.glide_to("table thead th:nth-child(1)")
+    sc.at(0.82); sc.glide_to("table tbody tr:nth-child(1) td:nth-child(5)")
+    sc.at(0.90); sc.glide_to("table tbody tr:nth-child(2) td:nth-child(5)")
+
+
+def s12_retention(sc):
+    p = sc.page
+    p.goto(f"{BASE}/admin/retention"); p.wait_for_timeout(1000)
+    sc.at(0.08); sc.glide(760, 330)
+    sc.at(0.50); sc.glide_to(":text('Defaults:')", dx=200)
+    sc.at(0.66); sc.glide_to(":text('Not enforced')", dx=200)
+    sc.at(0.78); sc.glide_to("table", dx=300)
+
+
+def s13_audit(sc):
+    p = sc.page
+    p.goto(f"{BASE}/admin/audit"); p.wait_for_timeout(1000)
+    sc.at(0.08); sc.glide_to("table thead th:nth-child(2)")
+    sc.at(0.20); sc.glide_to("select[name=action]")
+    p.select_option("select[name=action]", "prompt.activate")
+    sc.at(0.28); sc.click("form.audit-filters button")
+    p.wait_for_timeout(900)
+    sc.at(0.42); sc.glide_to("table tbody tr:nth-child(1) td:nth-child(2)")
+    sc.at(0.66); sc.glide_to("table tbody tr:nth-child(1) td:nth-child(6)")
+    sc.at(0.86); sc.glide(760, 300)
+
+
+SCENES = [("02", s02_map), ("03", s03_mint), ("04", s04_models), ("05", s05_caps), ("06", s06_prompt),
+          ("07", s07_question_set), ("08", s08_profile), ("09", s09_history), ("10", s10_coverage),
+          ("11", s11_review), ("12", s12_retention), ("13", s13_audit)]
+
+
 def main():
-    interview_id = os.environ.get("APP_RECORD")
-    engagement_id = os.environ.get("APP_PARENT")
-    if not (interview_id and engagement_id):
-        interview_id, engagement_id = ids_from_db()
-    print(f"interview {interview_id}\nengagement {engagement_id}", flush=True)
     only = set(sys.argv[1:])
     RAW.mkdir(parents=True, exist_ok=True)
-
-    # ---- scenes ----
-    def s02_join(page):
-        # paced to the 21 s VO: fields land as they are named, tracks hold while the three are described, submit on "press start"
-        t0 = time.time()
-
-        def at(t):
-            rem = t - (time.time() - t0)
-            if rem > 0:
-                page.wait_for_timeout(int(rem * 1000))
-
-        def glide_to(sel):
-            box = page.locator(sel).bounding_box()
-            if box:
-                glide(page, int(box["x"] + 24), int(box["y"] + box["height"] / 2))
-
-        page.goto(f"{BASE}/join")
-        at(2.6)
-        glide_to("input[name=respondent_name]")
-        at(3.6)
-        page.click("input[name=respondent_name]")
-        page.type("input[name=respondent_name]", "AP Lead (role-play)", delay=60)
-        at(5.6)
-        page.click("input[name=respondent_role]")
-        page.type("input[name=respondent_role]", "Accounts Payable Lead", delay=55)
-        at(7.6)
-        page.click("input[name=respondent_department]")
-        page.type("input[name=respondent_department]", "Finance", delay=60)
-        at(9.0)
-        glide_to("select[name=track]")
-        page.select_option("select[name=track]", "roleplay")
-        at(17.0)
-        glide_to("input[name=business_unit]")
-        page.click("input[name=business_unit]")
-        page.type("input[name=business_unit]", "Accounts payable", delay=55)
-        at(19.0)
-        page.select_option("select[name=org_size_band]", "250-2000")
-        at(20.0)
-        glide_to("button.btn-primary")
-        at(21.1)
-        with page.expect_navigation():
-            page.locator("button.btn-primary").click()
-        page.wait_for_timeout(2500)
-        s02_join.url = page.url
-
-    def s03_interview(page):
-        page.goto(getattr(s02_join, "url", f"{BASE}/join"))
-        page.wait_for_timeout(3500)
-        begin = page.locator("button", has_text="Begin").first
-        box = begin.bounding_box()
-        if box:
-            glide(page, int(box["x"] + box["width"] / 2), int(box["y"] + box["height"] / 2))
-        page.wait_for_timeout(600)
-        begin.click()
-        page.locator(".msg-assistant").first.wait_for(timeout=180_000)
-        page.wait_for_timeout(4500)
-        ta = page.locator("#composer textarea, #composer input[name=message]").first
-        ta.click()
-        page.type("#composer textarea, #composer input[name=message]", AP_ANSWER, delay=18)
-        page.wait_for_timeout(900)
-        send = page.locator("#composer button[type=submit], #composer button.btn-primary").first
-        box = send.bounding_box()
-        if box:
-            glide(page, int(box["x"] + box["width"] / 2), int(box["y"] + box["height"] / 2))
-        send.click()
-        page.locator(".msg-assistant").nth(1).wait_for(timeout=180_000)
-        page.wait_for_timeout(1500)
-        smooth_scroll(page, 4000, 1.5)
-        page.wait_for_timeout(5000)
-
-    def s04_boundary(page):
-        # mint a fresh link off camera so the scene opens directly on the intro card
-        import httpx
-        with httpx.Client(base_url=BASE, follow_redirects=False, timeout=30) as h:
-            eng = re.search(r'name="engagement_id" value="([^"]+)"', h.get("/join").text).group(1)
-            r = h.post("/join", data={"engagement_id": eng, "respondent_name": "Reviewer (role-play)",
-                                      "respondent_role": "Controller", "respondent_department": "Finance",
-                                      "track": "roleplay", "business_unit": "General ledger and close",
-                                      "org_size_band": "250-2000"})
-            url = BASE + r.headers["location"]
-        page.goto(url)
-        page.wait_for_timeout(2500)
-        glide(page, 700, 330, steps=36)
-        page.wait_for_timeout(2500)
-        glide(page, 700, 395, steps=24)
-
-    def s05_detail_jobs(page):
-        page.goto(f"{BASE}/interviews/{interview_id}")
-        page.wait_for_timeout(2500)
-        smooth_scroll(page, 700, 2.2)
-        smooth_scroll(page, 1500, 2.2)
-        scroll_to(page, "text=Pain points", 2.4)
-        smooth_scroll(page, page.evaluate("window.scrollY") + 600, 2.4)
-        scroll_to(page, "text=Topic coverage", 3.0)
-        page.goto(f"{BASE}/jobs")
-        page.wait_for_timeout(3000)
-        glide(page, 900, 420)
-        smooth_scroll(page, 500, 2.0)
-
-    def s06_engagement_brief(page):
-        page.goto(f"{BASE}/engagements/{engagement_id}")
-        page.wait_for_timeout(2500)
-        glide(page, 700, 500)
-        smooth_scroll(page, 600, 2.4)
-        scroll_to(page, "text=Generate ranking", 2.0, "center")
-        page.wait_for_timeout(1200)
-        page.goto(f"{BASE}/engagements/{engagement_id}/brief")
-        page.wait_for_timeout(3000)
-        smooth_scroll(page, 450, 2.4)
-        smooth_scroll(page, 1000, 2.4)
-        smooth_scroll(page, 1600, 2.4)
-        smooth_scroll(page, 2200, 2.4)
-
-    def s07_systems(page):
-        page.goto(f"{BASE}/engagements/{engagement_id}/brief")
-        page.wait_for_timeout(1800)
-        if not scroll_to(page, "text=Systems inventory", 2.4):
-            scroll_to(page, "text=systems", 2.4)
-        page.wait_for_timeout(1500)
-        smooth_scroll(page, page.evaluate("window.scrollY") + 500, 2.4)
-        smooth_scroll(page, page.evaluate("window.scrollY") + 500, 2.4)
-
-    def s08_admin(page):
-        page.goto(f"{BASE}/admin")
-        page.wait_for_timeout(2500)
-        smooth_scroll(page, 700, 2.2)
-        smooth_scroll(page, 1500, 2.2)
-        smooth_scroll(page, 2400, 2.2)
-        page.goto(f"{BASE}/admin/audit")
-        page.wait_for_timeout(3200)
-        smooth_scroll(page, 500, 2.0)
-        page.goto(f"{BASE}/admin/retention")
-        page.wait_for_timeout(3500)
-
-    def s09_architecture(page):
-        page.goto(f"{BASE}/architecture")
-        page.wait_for_timeout(2500)
-        smooth_scroll(page, 500, 2.4)
-        smooth_scroll(page, 1100, 2.4)
-        smooth_scroll(page, 1800, 2.4)
-
-    scenes = [("02", s02_join), ("03", s03_interview), ("04", s04_boundary), ("05", s05_detail_jobs),
-              ("06", s06_engagement_brief), ("07", s07_systems), ("08", s08_admin), ("09", s09_architecture)]
-
     results = {}
     with sync_playwright() as pw:
-        for scene, fn in scenes:
-            if only and scene not in only:
+        for sid, fn in SCENES:
+            if only and sid not in only:
                 continue
-            print(f"recording scene {scene}", flush=True)
-            raw = record(pw, scene, fn)
+            print(f"recording scene {sid} (vo {VO[sid]}s)", flush=True)
+            raw = record(pw, sid, fn)
             mp4 = to_mp4(raw)
-            results[scene] = {"clip": str(mp4), "duration": round(duration(mp4), 2)}
-            print(f"  -> {mp4.name} {results[scene]['duration']}s", flush=True)
+            results[sid] = {"clip": str(mp4), "duration": round(duration(mp4), 2)}
+            print(f"  -> {mp4.name} {results[sid]['duration']}s", flush=True)
+            write_manifest(results)  # after every scene, so a crash mid-run loses nothing
+    print(f"wrote {CAP / 'clips.json'}", flush=True)
 
+
+def write_manifest(results: dict) -> None:
     manifest = CAP / "clips.json"
     existing = json.loads(manifest.read_text()) if manifest.exists() else {}
     existing.update(results)
     manifest.write_text(json.dumps(existing, indent=2))
-    print(f"wrote {manifest}", flush=True)
 
 
 if __name__ == "__main__":

@@ -4,7 +4,7 @@ A respondent LLM plays an Accounts Payable lead and answers the interviewer
 over the app's own HTTP endpoints, so every job, audit and model_calls row
 lands exactly as it would for a human. Invented data only, roleplay track.
 
-IN: a running app at APP_BASE, OPENROUTER_API_KEY in the environment (never in a file this script writes).
+IN: a running app at BASE, OPENROUTER_API_KEY from the repo .env.
 OUT: transcript log in ../captures/, interview id + token printed at the end.
 """
 import asyncio
@@ -17,6 +17,7 @@ import time
 from pathlib import Path
 
 import httpx
+from dotenv import dotenv_values
 
 BASE = os.environ.get("APP_BASE", "http://127.0.0.1:8000")
 OUT = Path(__file__).resolve().parent.parent / "captures"
@@ -53,9 +54,10 @@ Rules for your answers:
 
 
 def _env_key() -> str:
-    key = os.environ.get("OPENROUTER_API_KEY", "")
+    vals = dotenv_values(REPO / ".env")
+    key = vals.get("OPENROUTER_API_KEY") or ""
     if len(key) < 20:
-        sys.exit("OPENROUTER_API_KEY missing from the environment")
+        sys.exit("OPENROUTER_API_KEY not readable from the repo .env")
     return key
 
 
