@@ -23,6 +23,7 @@ Forward slashes in paths; `new File()` accepts them on Windows. ES3 has no `JSON
 - VO layer `startTime = sceneStart + voLead`
 - clip: scaled to `(compW - 80) / clipW` so a 40 px inset shows the comp background, Ken Burns +3.5 % over the scene, 0.45 s opacity fades; if the clip is shorter than the scene, time-remap holds the last frame (logged)
 - lower third: rounded panel + accent stripe + Inter Medium 34 px, slides in 24 px at `sceneStart + 0.5`, holds 6 s
+- title and outro card text is shrunk to fit (`fitWidth`, 4 px steps, floor 40/26 px) before the block is centred; without it a long closing sentence runs off both edges
 - comp markers at each scene start, named `NN title`, so the timeline is navigable by hand afterwards
 - background solid in the app's own `--bg`; accent and ink from the app's CSS tokens so the cards match the product
 

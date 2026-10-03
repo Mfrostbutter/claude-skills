@@ -75,6 +75,13 @@
     return layer;
   }
   function rectOf(layer) { return layer.sourceRectAtTime(0, false); }
+  function fitWidth(layer, maxW, minSize) {
+    // shrink a card's text until it fits the frame; long outro lines otherwise run off both edges
+    var td = layer.property("ADBE Text Properties").property("ADBE Text Document"), doc = td.value;
+    while (rectOf(layer).width > maxW && doc.fontSize > minSize) {
+      doc.fontSize = doc.fontSize - 4; td.setValue(doc); doc = td.value;
+    }
+  }
   function placeLeft(layer, left, baseline) {
     var r = rectOf(layer);
     tg(layer).property("ADBE Position").setValue([left - r.left, baseline]);
@@ -140,6 +147,7 @@
         var bar = makeRect(comp, "bar-" + s.id, 0, 0, 14, 150, accent, 0);
         var h1 = makeText(comp, "h1-" + s.id, s.title_text, fBold, s.kind === "title" ? 92 : 72, ink, -20);
         var h2 = makeText(comp, "h2-" + s.id, s.subtitle_text || "", fReg, 38, muted, 0);
+        fitWidth(h1, Wd - 300, 40); fitWidth(h2, Wd - 300, 26);
         var r1 = rectOf(h1), r2 = rectOf(h2);
         var blockW = Math.max(r1.width, r2.width) + 60, left = (Wd - blockW) / 2 + 60;
         var base1 = Ht / 2 - 10, base2 = base1 + 70;
