@@ -25,7 +25,8 @@ Check, in one pass, before writing anything:
 
 - **After Effects** installed and **open** (`Get-Process AfterFX`), `aerender.exe` under `Support Files`, ffmpeg + ffprobe on PATH (or `FFMPEG` / `FFPROBE` env vars), `node` for syntax-checking the .jsx.
 - **AE scripting pref** "Allow Scripts to Write Files and Access Network" (Edit > Preferences > Scripting & Expressions). Off by default; the build script writes a log and saves the .aep. This and "AE open" are human blockers: put them in the question batch, not only here.
-- **TTS key** reachable: read it from your secrets manager (Infisical, 1Password, a `.env` outside the repo) into a shell variable, print only `${#KEY}` and a sha256 prefix, then `GET /v1/voices`, `/v1/models`, `/v1/user/subscription`. A clone exposes `fine_tuning.state` per model; pick a model it is tuned for.
+- **TTS key** reachable: read it from your secrets manager (Infisical, 1Password, a `.env` outside the repo) into a shell variable, print only `${#K}` and a sha256 prefix, then `GET /v1/voices`, `/v1/models`, `/v1/user/subscription`. A clone exposes `fine_tuning.state` per model; pick a model it is tuned for. Keep the fetch in a small helper script so the secret never appears in a command line or a transcript.
+- **Subject app build.** If the app is a local playground (compose, a dev server), rebuild it from the current source before filming; the dogfood box is usually a build or two behind what the script will describe.
 - **Data.** Count rows behind every page you intend to film (DB query, or the app's API). Zero rows on a new feature's page is the common failure; decide now whether to populate.
 - **Identifier scan.** For server-rendered pages, `curl` each URL and `grep -ci` for hostnames, LAN IPs, personal names, repo names. For a SPA, curl returns an empty shell: scan `page.content()` from Playwright after the route renders. Headless capture has no URL bar, which removes the localhost tell for free.
 - **Login.** If the app has one, find a demo account whose credentials live in `.env` or a secrets manager, never in the capture script. Log in once in the first scene (type a masked password), save `storage_state`, reuse it in every later context.
@@ -66,6 +67,10 @@ Voice rules for an overview: plain spoken English, short sentences, contractions
 
 - `channel="chromium"`, headless, viewport 1920x1080, `record_video_dir` per context, `color_scheme` matching the app.
 - One browser context per scene, closed before the next, so each scene is its own `.webm`. The file is only complete after `ctx.close()`; rename then.
+- **Pre-seed the first-run state off.** Every SPA has a coach-mark tour, a welcome banner, or a "get started" card that dims the page on a fresh profile. Find the localStorage keys in the app's onboarding code and set them in `PRESEED` (injected by the init script before the app boots); hide the rest with `HIDE_CSS`.
+- **A fresh context resets the browser, not the server.** If a scene changes server state on camera (switches the selected instance or tenant, toggles a flag), every later scene films that state. Put the restoring API call in `reset_server_state()`, which runs at the top of every scene.
+- **Hash-routed SPAs need a fresh page per view.** Many read `location.hash` at init only; clicking a sidebar button inside a collapsed group times out and setting the hash on an open page does nothing. Use `view()` (a new `goto` per scene) and survey each route once before writing scenes.
+- Selectors that match many nodes (`:text('name')`) pick an unclickable first match; prefer a row class (`.row:has-text('name')`), an id, or a `data-` attribute, and keep `glide_to` / `click` tolerant (skip when absent, never wait out a timeout on camera).
 - A fake cursor injected with `add_init_script` (fixed-position SVG following `mousemove`, shrinks on `mousedown`). Playwright video has no pointer; without this, clicks and typing are invisible.
 - `page.mouse.move(x, y, steps=28)` for glides, `page.type(..., delay=45)` for typing, `scrollTo({behavior:'smooth'})` with 1.6 to 2.4 s per stop, `scrollIntoView` on a `text=` locator to land on a section.
 - Hold on the final state until the scene's VO duration + 3 s (read from `vo/manifest.json`; `MIN_LEN` is the fallback), then convert: `ffmpeg -r 30 -c:v libx264 -crf 17 -pix_fmt yuv420p -an`. AE does not import webm.
@@ -99,6 +104,8 @@ Look at the frames. The lower-third text hidden under its own panel was invisibl
 
 If the script changes after a review (audience, length), keep the captures: regenerate only the changed VO (hash skip), re-assemble, rebuild, re-render. Kill an in-flight render the moment the script is known to change.
 
+**Inserting scenes** (the common "also cover X" follow-up): keep the last narrated scene last so the outro card is unchanged, and renumber the kept scenes by renaming their files (`vo/NN.mp3`, the content-addressed wav, the manifest id, `captures/scene_NN.mp4`, the `clips.json` key) rather than regenerating; the VO hash skip then holds and only the new sections are billed. Give the new render a new output name (`-v2-review`); a player still holding the previous review file blocks an overwrite.
+
 ## 7. Close out
 
 - Keep: `out/walkthrough-final.mp4`, `ae/walkthrough.aep`, `vo/script.md`, `vo/*.wav`, `captures/*.mp4`, the scripts (copy improvements back into this skill's `scripts/`). The raw webm can go.
@@ -111,6 +118,7 @@ If the script changes after a review (audience, length), keep the captures: rege
 - **Write the overview for the stated audience's level.** CSM and customer cuts: what you do and what you get, plain words, no analogies, no contrast phrasing. Mechanism belongs in a separate engineering cut.
 - **VO before capture.** The voice decides each scene's length; capturing first means guessing and freezing frames.
 - **Never alert() in the AE script's error path.** A modal dialog blocks every later `AfterFX -r` until a human clicks it. Log to a file and exit.
+- **Start every build from an empty project.** The jsx closes the open project (`DO_NOT_SAVE_CHANGES`) and calls `app.newProject()` first. Saving over the project the previous build left open raises a native "Save Project" dialog that `-r` cannot answer, and the pipeline's log wait then looks like a slow build. If the wait passes a minute, list the AE process's visible windows before assuming it is working.
 - **Never `"" + errorObject` in ExtendScript.** It throws, masks the real error, and leaves an empty log. Use `err.message` and `err.line`.
 - **Do not lock a layer you still have to move.** Build, `moveToEnd()`, then lock.
 - **New layers land on top.** Create panels before text, or `text.moveToBeginning()`.
@@ -119,4 +127,6 @@ If the script changes after a review (audience, length), keep the captures: rege
 - **Every stage stops the chain.** `set -o pipefail`; never `step | tail || exit`. A masked VO failure rendered a cut with half-new audio.
 - **Aborting a render means killing `aerender` and its `AfterFX.com` engines**, then clearing the PID-named partials, before touching any audio file they imported.
 - **Do not put anything in a synced repo tree**, and if the app's repo is a Syncthing follower, no git writes there either.
+- **Revert on-camera server-state changes before the next scene.** A new browser context does not undo an instance switch or a toggled flag on the backend; `reset_server_state()` runs first in every scene for this reason.
+- **Survey before you script.** One screenshot per route, with the first-run tour pre-seeded off, before the VO is written. A page that is empty on the dogfood box (no billing sources, no runs) needs data or a different tab; discovering that after the voice is generated costs a reshoot.
 - **Invented data only on camera**, labelled as such wherever the app supports it.

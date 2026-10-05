@@ -4,7 +4,7 @@
 
 - Python Playwright 1.63, `pw.chromium.launch(channel="chromium", headless=True)`; `python -m playwright install chromium` is enough (the headless shell comes with it).
 - `new_context(viewport=1920x1080, device_scale_factor=1, record_video_dir=RAW, record_video_size=1920x1080, color_scheme="dark")`. One context per scene.
-- `ctx.add_init_script(CURSOR_JS)` injects the pointer. It is a `position:fixed` div with a 22 px SVG arrow, `z-index` max, updated on `mousemove` (capture phase), scaled to 0.8 on `mousedown`. It runs on every navigation inside the context, so it survives `page.goto`.
+- `ctx.add_init_script(INIT_JS)` seeds `PRESEED` into localStorage (first-run tours and banners off), applies `HIDE_CSS`, and injects the pointer. It is a `position:fixed` div with a 22 px SVG arrow, `z-index` max, updated on `mousemove` (capture phase), scaled to 0.8 on `mousedown`. It runs on every navigation inside the context, so it survives `page.goto`.
 - Timing that reads well at 30 fps: glide 28 steps, type delay 45 ms (18 ms for a long paragraph), 400 to 900 ms pauses between fields, 1.6 s per smooth-scroll stop, 2.4 s when the viewer needs to read.
 - `page.video.path()` is only final after `ctx.close()`; capture the `page.video` object before closing, then rename.
 - Convert: `ffmpeg -y -i scene.webm -r 30 -c:v libx264 -preset slow -crf 17 -pix_fmt yuv420p -vf scale=1920:1080:flags=lanczos -an scene.mp4`. The webm is VP8 at a variable frame rate; forcing 30 fps keeps AE happy.

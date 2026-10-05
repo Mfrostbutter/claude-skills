@@ -29,8 +29,25 @@ VO_LEAD, TAIL = 0.6, 3.0  # VO starts 0.6 s into the scene in the comp; hold 3 s
 
 VO = {s["id"]: s["duration"] for s in json.loads((ROOT / "vo" / "manifest.json").read_text(encoding="utf-8"))["scenes"]}
 
-CURSOR_JS = """
+# localStorage keys the app reads at boot: first-run tours, welcome banners, "get started" cards.
+# Find them in the app's onboarding code; a tour that dims the page ruins every scene.
+PRESEED = {}  # e.g. {"app_tips_enabled": "0", "app_welcome_dismissed": "1"}
+# elements to hide outright when no localStorage key controls them
+HIDE_CSS = ""  # e.g. "#welcome-banner{display:none !important}"
+
+INIT_JS = """
 (() => {
+  try {
+    const seed = __PRESEED__;
+    for (const k in seed) localStorage.setItem(k, seed[k]);
+  } catch (e) {}
+  const css = __HIDE_CSS__;
+  if (css) {
+    const style = document.createElement('style');
+    style.textContent = css;
+    const addStyle = () => document.head && document.head.appendChild(style);
+    document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', addStyle) : addStyle();
+  }
   const c = document.createElement('div');
   c.id = '__cur';
   c.style.cssText = 'position:fixed;left:0;top:0;width:22px;height:22px;z-index:2147483647;pointer-events:none;'
@@ -62,7 +79,10 @@ class Scene:
         self.page.wait_for_timeout(250)
 
     def glide_to(self, sel: str, dx: int = 24):
-        box = self.page.locator(sel).first.bounding_box()
+        loc = self.page.locator(sel)
+        if loc.count() == 0:
+            return  # not on screen in this state: skip, never wait out a timeout on camera
+        box = loc.first.bounding_box()
         if box:
             self.glide(int(box["x"] + min(dx, box["width"] / 2)), int(box["y"] + box["height"] / 2))
 
@@ -79,7 +99,9 @@ class Scene:
 
     def click(self, sel: str):
         self.glide_to(sel)
-        self.page.locator(sel).first.click()
+        loc = self.page.locator(sel)
+        if loc.count():
+            loc.first.click()
 
     def hold_min(self):
         rem = VO_LEAD + self.vo + TAIL - (time.time() - self.t0)
@@ -92,12 +114,13 @@ def record(pw, sid: str, fn):
     ctx = browser.new_context(viewport={"width": W, "height": H}, device_scale_factor=1,
                               record_video_dir=str(RAW), record_video_size={"width": W, "height": H},
                               color_scheme="dark")
-    ctx.add_init_script(CURSOR_JS)
+    ctx.add_init_script(INIT_JS.replace("__PRESEED__", json.dumps(PRESEED)).replace("__HIDE_CSS__", json.dumps(HIDE_CSS)))
     page = ctx.new_page()
     page.set_default_timeout(60_000)
     page.mouse.move(1180, 620)
     sc = Scene(page, sid)
     try:
+        reset_server_state(page)
         fn(sc)
         sc.hold_min()
     finally:
@@ -128,6 +151,27 @@ def duration(path: Path) -> float:
 
 
 H2 = "h2:has-text('{}')"
+
+
+def reset_server_state(page):
+    """Undo anything an earlier scene changed on the SERVER (active tenant, selected instance, a toggled flag).
+
+    A fresh browser context resets the client, not the backend; a scene that switches
+    the selected instance on camera leaves every later scene filming the wrong one.
+    Put the API call that restores the filming state here, e.g.
+    page.request.post(f"{BASE}/api/instances/{MAIN_INSTANCE}/activate").
+    """
+    return
+
+
+def view(sc, route: str, wait: float = 2.6):
+    """Open a view with a fresh page load.
+
+    Hash-routed SPAs often read location.hash at init only, so navigating by clicking
+    the sidebar (or setting the hash on an open page) does nothing; a new goto works.
+    """
+    sc.page.goto(f"{BASE}/#{route}")
+    sc.page.wait_for_timeout(int(wait * 1000))
 
 
 # ---- scenes ----

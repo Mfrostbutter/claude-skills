@@ -105,6 +105,9 @@
   function span(layer, inT, outT) { layer.startTime = inT; layer.inPoint = inT; layer.outPoint = outT; }
 
   try {
+    // a second build in the same AE session must start clean: saving over the open project raises a Save dialog that blocks -r forever
+    try { if (app.project) app.project.close(CloseOptions.DO_NOT_SAVE_CHANGES); } catch (e0) {}
+    app.newProject();
     app.beginUndoGroup("Build walkthrough");
     var dir = scriptDir();
     var raw = readText(dir + "manifest.json");
