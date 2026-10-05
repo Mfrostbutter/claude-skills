@@ -144,6 +144,32 @@ def to_mp4(src: Path) -> Path:
     return dst
 
 
+def compress_middle(src: Path, dst: Path, start: float, end: float, target: float,
+                    head: float = 6.0, tail: float = 14.0) -> Path:
+    """Cut [start, end) of src into dst, time-compressing the middle so the clip lasts `target` seconds.
+
+    The first `head` and last `tail` seconds stay real time, so the click that starts a long
+    operation and the result that ends it read naturally; only the waiting in between speeds up.
+    Used when a scene films a deploy or a job whose wall clock outruns its narration.
+    """
+    total = end - start
+    if total <= target + 1:
+        subprocess.run([FFMPEG, "-y", "-loglevel", "error", "-ss", f"{start:.2f}", "-to", f"{end:.2f}", "-i", str(src),
+                        "-r", "30", "-c:v", "libx264", "-preset", "slow", "-crf", "17", "-pix_fmt", "yuv420p",
+                        "-vf", "scale=1920:1080:flags=lanczos", "-an", str(dst)], check=True)
+        return dst
+    mid_src = total - head - tail
+    mid_dst = max(target - head - tail, 4.0)
+    factor = mid_dst / mid_src
+    fc = (f"[0:v]trim=start={start:.2f}:end={start + head:.2f},setpts=PTS-STARTPTS[a];"
+          f"[0:v]trim=start={start + head:.2f}:end={start + head + mid_src:.2f},setpts=(PTS-STARTPTS)*{factor:.5f}[b];"
+          f"[0:v]trim=start={start + head + mid_src:.2f}:end={end:.2f},setpts=PTS-STARTPTS[c];"
+          f"[a][b][c]concat=n=3:v=1:a=0,fps=30,scale=1920:1080:flags=lanczos[v]")
+    subprocess.run([FFMPEG, "-y", "-loglevel", "error", "-i", str(src), "-filter_complex", fc, "-map", "[v]",
+                    "-c:v", "libx264", "-preset", "slow", "-crf", "17", "-pix_fmt", "yuv420p", "-an", str(dst)], check=True)
+    return dst
+
+
 def duration(path: Path) -> float:
     out = subprocess.run([FFPROBE, "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(path)],
                          capture_output=True, text=True, check=True).stdout.strip()
