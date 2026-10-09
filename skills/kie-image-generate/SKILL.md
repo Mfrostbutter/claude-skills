@@ -42,10 +42,11 @@ regardless of ratio (see `kie-image-edit/references/models.md`); there is no res
 present. A rejected parameter or a billing failure looks like success to a status-code check.
 
 **Auth is one header**, `Authorization: Bearer <key>`. A header named `apikey` is a 401. The key is
-`KIE_API_KEY` in the environment (`KIE_AI_API_KEY` also read). It is a personal key from
-kie.ai/api-key, not in Infisical n8n-FDE as of 2026-10-09; `scripts/run.sh` falls back to
-`~/.config/kie/api-key` (mode 600) so the owner places it once from their own terminal. Never
-print it, never paste it in chat.
+`KIE_API_KEY` in the environment (`KIE_AI_API_KEY` also read). In the FDE practice it is
+`KIE_AI_API_KEY` in Infisical n8n-FDE prod (added 2026-10-09), so the run is
+`infisical run --env prod --projectId <n8n-FDE id> -- bash scripts/run.sh scripts/generate.py`;
+elsewhere `scripts/run.sh` falls back to `~/.config/kie/api-key` (mode 600). Never print it,
+never paste it in chat.
 
 Kie also publishes its own agent skills (`npx skills add https://kie.ai`: `kie-models` reads the
 live model list and parameters). This skill exists because the practice already has the edit
@@ -74,8 +75,11 @@ spell-out. Concrete nouns beat adjectives.
 
 - **The logo is text plus a mark; describe both as objects.** "On the chest of the hoodie, the
   n8n logo: the lowercase wordmark n8n in a bold rounded sans-serif, white, beside a small
-  coral-pink node symbol of connected circles." Then spell it: `n-8-n`. Without the spell-out the
-  model writes n8m, nan or 88n about one time in three.
+  coral-pink node symbol of connected circles." Then spell it in words: "three characters, the letter n then
+  the digit 8 then the letter n, written together with no hyphen or space". Without a spell-out
+  the model writes n8m, nan or 88n about one time in three; with the hyphenated form `n-8-n`
+  that the edit skill uses, Seedream printed the hyphen on the hoodie (one of three renders on
+  2026-10-09). Hyphens work for editing existing text and leak when the text is being drawn fresh.
 - **Name the version of the logo when it matters.** A brand mid-refresh has two marks; the
   model knows neither, so describe the one you want and say "no other logo, no other text
   anywhere". For the mark itself, image-to-image with a hosted PNG of the logo in

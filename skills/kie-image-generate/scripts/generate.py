@@ -9,6 +9,8 @@ Pack shape:
  "output_format": "png", "reference_urls": [],
  "variants": {"v1_slug": "prompt", "v2_slug": {"prompt": "...", "aspect_ratio": "1:1"}}}
 """
+from __future__ import annotations
+
 import json
 import os
 import struct
