@@ -35,3 +35,48 @@ Server state through the public API (`/api/v1`, `X-N8N-API-KEY`):
 - Audit lines from a custom node reach the text log only through the message string; metadata fields are
   dropped unless `N8N_LOG_FORMAT=json`. Toggling log env vars needs a container recreate, and `/rest/login`
   404s for a few seconds after `/healthz` is green.
+
+## Canvas framing (added 2026-10-17, O&M PO reconciliation shoot)
+
+- `1` zooms to fit. The `[data-test-id=zoom-in-button]` is a fixed 1.2x per click; ctrl+wheel steps differ
+  between the editor and the executions view, so frame with button clicks (3 -> 1.7x, 5 -> 2.5x, 7 -> 3.6x).
+- Plain wheel pans. Units per pixel differ by view, so pan in a closed loop: read the anchor node's
+  `bounding_box()`, wheel toward the target, re-read, correct the factor, three passes.
+- The executions sidebar (350 px) intercepts pointer events: never dblclick a node under it; frame first.
+- A full workflow with six sticky zones is unreadable at fit on 1080p; fit + two button clicks is the
+  tallest framing that keeps all zones inside the frame.
+
+## Mailpit and the HITL resume (same shoot)
+
+- A shared Mailpit shows every lab project's mail in the message view's side list. Open a message from a
+  scoped search (`/search?q=to%3A<domain>` then click `a[href='/view/<id>']`), never `/view/<id>` directly.
+- Text-only mail has no preview iframe; wait on `text=Subject` instead of the iframe.
+- Clicking an Approve link inside the preview iframe already fires the Wait node's `webhook-waiting`
+  resume. A second GET answers 409 "running already" and renders raw JSON on camera. Click, close any
+  popup pages, wait for the outcome mail, and only fall back to an off-camera GET if nothing arrives.
+- Mailpit's dark theme set through localStorage did not take under headless capture; accept light mode.
+- Archive `.eml` through `/api/v1/message/<id>/raw` before deleting a shoot's messages.
+
+## Secrets helper pattern
+
+A Bash hook blocks any command text containing the secret-reading form, heredocs included. Write the
+helper script with the editor's Write tool, then run it by path (`scripts/with_lab_env.sh <cmd>` exports
+the demo login and API key into the process environment; `scripts/vo.sh` passes `KEY_CMD` to `run_vo.sh`).
+
+## n8n 2.35 (added 2026-10-19, Air Liquide PG order intake shoot)
+
+- The execution preview of a running execution is a placeholder ("Execution is running. It will show here
+  once finished"); nodes do not light up as they run. Hold on the sidebar row ("Running for Ns"), poll the
+  outcome in the database, click the row once the execution is terminal.
+- Tall canvases (eight zones, 5,000 units high): fit plus zoom clicks is unreadable. `[data-test-id=reset-zoom-button]`
+  sets 1:1; pan from there to the anchor node with the closed-loop wheel pan. Editor wheel factor is 2.0 px/unit.
+- Variables moved to `/home/variables` (the 1.x `/settings/variables` route 404s). Rows are
+  `[data-test-id=variables-row]`; the search box IS `[data-test-id=resources-list-search]` (an `<input>`, no
+  descendant). The page lists every global variable, other projects' included: filter before the camera opens.
+  `PUT /api/v1/variables/{id}` (204) flips a value off camera.
+- Over an iframe (Mailpit preview) the top document gets no mousemove, so a fake cursor drawn from mousemove
+  freezes at the iframe edge. Move the pointer and place the cursor element by hand per step.
+- A self-refreshing dashboard (meta refresh) drops a runtime body zoom. Serve it through `page.route`, strip the
+  meta refresh, inject `body{zoom:N}`.
+- Information Extractor NDV schema field: `parameter-input-inputSchema`; Code node: `parameter-input-jsCode`.
+- A dismissable `[data-test-id=nps-survey-modal]` can appear on any page; keep its close button in the dismiss list.

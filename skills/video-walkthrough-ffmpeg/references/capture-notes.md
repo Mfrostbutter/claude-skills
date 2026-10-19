@@ -49,11 +49,17 @@ Verify with the frame grids before assembling.
 - Discover: `GET /v1/voices` (name, voice_id, category premade|professional), `GET /v1/models`,
   `GET /v1/user/subscription`. The voice the user names may not be on the account; pick a premade substitute,
   say so, and record the id in the manifest (`make_vo.py` does).
-- `POST /v1/text-to-speech/{voice_id}?output_format=mp3_44100_128`, `eleven_multilingual_v2`, settings
-  stability 0.5, similarity 0.8, style 0.12, speaker boost, speed 1.08. Accept only `audio/*` bodies with ID3
+- `POST /v1/text-to-speech/{voice_id}?output_format=mp3_44100_128`, `eleven_v3`, settings
+  stability 0.5, similarity 0.8, style 0.12, speaker boost, speed 1.0. Default voice: Jessica Anne Bogart,
+  VO Professional (`lxYfHSkYm1EzQzGhdbfc`, library voice; add it to a new workspace with
+  `POST /v1/voices/add/{public_owner_id}/{voice_id}` first). Matilda on multilingual_v2 at 1.08 read robotic
+  (Air Liquide shoot, 2026-10-19); speed above 1.0 flattens prosody.
+- Voice scouting: `GET /v1/shared-voices?gender=female&language=en&sort=usage_character_count_1y` ranks the
+  library by real use; every row carries a `preview_url` to audition without adding the voice. Accept only `audio/*` bodies with ID3
   or MPEG sync bytes; retry otherwise.
 - Loudness: `loudnorm=I=-16:TP=-1.5:LRA=11`, 48 kHz mono WAV.
-- Measured: 16.4 characters per second at speed 1.08 (about 140 wpm). Budget 15 per target second.
+- Measured: 16.4 characters per second at speed 1.08 (Matilda); re-measure with the manifest for the
+  default voice at speed 1.0 and budget 14 per target second until then.
 - The script hash per scene lives in the manifest; a one-line edit regenerates one scene.
 
 ## Two cuts from one shoot

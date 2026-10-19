@@ -12,6 +12,7 @@ import subprocess
 from pathlib import Path
 
 CUT = os.environ.get("CUT", "main")
+LT_X = "W-w-64" if os.environ.get("LT_POS", "left") == "right" else "64"  # lower-third side; right clears n8n zoom controls
 QUALITY = os.environ.get("QUALITY", "review")
 ROOT = Path(__file__).resolve().parent.parent
 VO = {s["id"]: s for s in json.loads((ROOT / "vo" / CUT / "manifest.json").read_text())["scenes"]}
@@ -49,10 +50,10 @@ for sid in sorted(VO):
     fade_in = "fade=t=in:st=0:d=0.5" if sid == first else "null"
     vf = f"[0:v]tpad=stop_mode=clone:stop_duration=60,trim=duration={dur},setpts=PTS-STARTPTS,{fade_in}[v0]"
     if lower.exists() and sid in LOWER_THIRDS:
-        inputs += ["-i", str(lower)]
+        inputs += ["-loop", "1", "-framerate", "30", "-i", str(lower)]  # loop the still: a one-frame input sits at t=0, before the fade-in, and never shows
         vf += (f";[2:v]format=rgba,fade=t=in:st={LT_IN}:d={LT_FADE}:alpha=1,"
                f"fade=t=out:st={dur - LT_OUT_BEFORE_END:.2f}:d={LT_FADE}:alpha=1[lt];"
-               f"[v0][lt]overlay=x=64:y=H-h-64:shortest=0[v]")
+               f"[v0][lt]overlay=x={LT_X}:y=H-h-64:shortest=0[v]")
     else:
         vf += ";[v0]null[v]"
     ms = int(VO_LEAD * 1000)

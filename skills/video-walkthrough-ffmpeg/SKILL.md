@@ -42,8 +42,10 @@ One pass, before writing anything:
 - **ffmpeg and ffprobe** on PATH (`brew install ffmpeg`, with the user's OK). A Python env with `playwright`
   and `httpx`, and `python -m playwright install chromium`. No editor app, no GUI, no scripting pref.
 - **TTS key** reachable: fetch it from the secrets manager into a shell variable inside a helper script
-  (`scripts/run_vo.sh`), print only its length, then `GET /v1/voices`. The voice the user names may not be
-  on the account; list the premade voices and pick a substitute, and say so in the handoff.
+  (`scripts/run_vo.sh`), print only its length, then `GET /v1/voices`. Default voice: Jessica Anne Bogart,
+  VO Professional (`lxYfHSkYm1EzQzGhdbfc`) on `eleven_v3` at speed 1.0; it must exist in the workspace
+  (`POST /v1/voices/add/...` once). The voice the user names may not be on the account; list the voices
+  and pick a substitute, and say so in the handoff.
 - **Subject app** running and current. Rebuild a local playground from source before filming.
 - **Data.** Count rows behind every page you intend to film. Empty pages need seeding (the app's API, its
   fixtures, or a synthetic run). Invented data only on camera.
@@ -58,7 +60,8 @@ One pass, before writing anything:
 
 Recommended option first on each. Nothing downstream starts before the answers land.
 
-1. Voice: the user's own ElevenLabs clone, or a stock voice (name two).
+1. Voice: the default (Jessica Anne Bogart, VO Professional), the user's own ElevenLabs clone, or another
+   library voice (offer the `shared-voices` usage ranking and its previews).
 2. Audience and technical level, plus length. Offer the cuts plainly: a customer or CSM overview (what it is,
    what you do, what you get) and an admin or engineering cut (how to set it up). "Both" is a normal answer;
    the captures are shared and only the scripts differ.
@@ -80,7 +83,7 @@ narrates the title card; the last narrated section is the closing card; the outr
 The VO generator parses the headings, so the heading shape is load-bearing. Lower-third captions live in
 `scenes/lower_thirds.json`, keyed by cut and scene id.
 
-Budget 15 characters per target second (measured 16.4 chars/s at speed 1.08). A 3:00 admin cut is about
+Budget 14 characters per target second at speed 1.0 (16.4 chars/s was measured at speed 1.08). A 3:00 admin cut is about
 2,700 characters; a 1:45 overview about 1,600. Spell out things the voice would mangle (`NODES underscore
 EXCLUDE`). Plain spoken English, short sentences, one idea per scene, product names said plainly. No
 analogies, no "in this video", no contrast phrasing in an overview cut.

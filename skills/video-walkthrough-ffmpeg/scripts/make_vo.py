@@ -19,10 +19,10 @@ HERE = Path(__file__).resolve().parent
 VO = Path(os.environ.get("VO_DIR", HERE.parent / "vo"))
 FFMPEG = os.environ.get("FFMPEG", "ffmpeg")
 FFPROBE = os.environ.get("FFPROBE", "ffprobe")
-VOICE_ID = os.environ.get("ELEVENLABS_VOICE_ID", "XrExE9yKIg1WjnnlVkGX")  # Matilda (premade); list voices with GET /v1/voices
-MODEL = os.environ.get("ELEVENLABS_MODEL", "eleven_multilingual_v2")
+VOICE_ID = os.environ.get("ELEVENLABS_VOICE_ID", "lxYfHSkYm1EzQzGhdbfc")  # Jessica Anne Bogart, VO Professional (library voice, added to the workspace 2026-10-19)
+MODEL = os.environ.get("ELEVENLABS_MODEL", "eleven_v3")
 SETTINGS = {"stability": 0.5, "similarity_boost": 0.8, "style": 0.12, "use_speaker_boost": True,
-            "speed": float(os.environ.get("ELEVENLABS_SPEED", "1.08"))}
+            "speed": float(os.environ.get("ELEVENLABS_SPEED", "1.0"))}
 
 
 def parse_script(md: str) -> list[dict]:
