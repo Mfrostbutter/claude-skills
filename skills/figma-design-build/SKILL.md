@@ -67,3 +67,4 @@ Rects, ellipses, text only get you so far. For slanted/parallelogram shapes use 
 - `reference/09-raster-images.md` — importing screenshots / logos / photos via `upload_assets`, FILL vs FIT, pre-crop, framing a screenshot.
 - `reference/10-brand-n8n-itl.md` — the n8n In The Loop presentation language: black / white / pink palette, Zalando Sans (Inter as twin), type ramp, composition rules. Load it for anything that sits next to an ITL deck; `assets/helpers.js` has `N8N` + `n8nStyles()`.
 - `assets/helpers.js` — copy-paste helper library for `use_figma` calls.
+- `../n8n-figma-brand-boards/` — the n8n October 2026 brand recipe for Figma Design: variable collections with Light and Dark, `n8n/` text styles, Card and Capsule components, artboard prelude with vector arrows. Load it instead of `reference/10` for anything on the 2026 brand.
