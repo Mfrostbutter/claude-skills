@@ -83,7 +83,7 @@ narrates the title card; the last narrated section is the closing card; the outr
 The VO generator parses the headings, so the heading shape is load-bearing. Lower-third captions live in
 `scenes/lower_thirds.json`, keyed by cut and scene id.
 
-Budget 14 characters per target second at speed 1.0 (16.4 chars/s was measured at speed 1.08). A 3:00 admin cut is about
+Budget 14 characters per target second (measured 14.0 chars/s with the default voice at speed 1.0). A 3:00 admin cut is about
 2,700 characters; a 1:45 overview about 1,600. Spell out things the voice would mangle (`NODES underscore
 EXCLUDE`). Plain spoken English, short sentences, one idea per scene, product names said plainly. No
 analogies, no "in this video", no contrast phrasing in an overview cut.

@@ -58,8 +58,8 @@ Verify with the frame grids before assembling.
   library by real use; every row carries a `preview_url` to audition without adding the voice. Accept only `audio/*` bodies with ID3
   or MPEG sync bytes; retry otherwise.
 - Loudness: `loudnorm=I=-16:TP=-1.5:LRA=11`, 48 kHz mono WAV.
-- Measured: 16.4 characters per second at speed 1.08 (Matilda); re-measure with the manifest for the
-  default voice at speed 1.0 and budget 14 per target second until then.
+- Measured: 14.0 characters per second for the default voice at speed 1.0 (three cuts, 2026-10-19);
+  16.4 at speed 1.08 with Matilda. Budget 14 per target second.
 - The script hash per scene lives in the manifest; a one-line edit regenerates one scene.
 
 ## Two cuts from one shoot
