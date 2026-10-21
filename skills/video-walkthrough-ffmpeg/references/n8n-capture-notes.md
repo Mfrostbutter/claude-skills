@@ -80,3 +80,19 @@ the demo login and API key into the process environment; `scripts/vo.sh` passes 
   meta refresh, inject `body{zoom:N}`.
 - Information Extractor NDV schema field: `parameter-input-inputSchema`; Code node: `parameter-input-jsCode`.
 - A dismissable `[data-test-id=nps-survey-modal]` can appear on any page; keep its close button in the dismiss list.
+
+## n8n 2.35 data tables and the portrait canvas (added 2026-10-21, O&M native-node re-shoot)
+
+- A data table page (`/projects/<id>/datatables/<tableId>`) is an AG Grid, not an HTML table: rows are
+  `.ag-center-cols-container .ag-row:has-text('R7')`, never `tr:has-text(...)`. The pinned-left container
+  holds a second `.ag-row` per record (checkbox and id), so scope to the centre container. Columns start at
+  `x = 42`; `glide_to(row, dx=...)` with dx 300 (rule_id), 900 (weight), 1150 (hard), 1420 (enabled),
+  1680 (threshold) lands on the cells at 1080p. The grid inherits the n8n theme preseeded in localStorage.
+- A five-row portrait board (panel plus five zone rows, 2,600 units tall) reads at fit plus one zoom click
+  only if the scene holds on one row; fit plus two clips the bottom row. Open at fit + 1, then `pan_to()`
+  the anchor node when the voice reaches it. `frame()` = fit, N button clicks, closed-loop pan.
+- `capture.py 05 06 07` re-shoots a list of scenes; `clips.json` merges per scene, so a crash mid-run leaves
+  the earlier scenes' clips valid and the later ones stale by mtime. Check `ls -lT` before `frames.py`.
+- `frames.py` has no scene filter; it fails on a clip that is still being written. Run it after the capture.
+- The wrapper's `; echo "exit $?"` masks a Python traceback: grep the log for `Traceback` before trusting
+  exit 0.
