@@ -46,8 +46,9 @@ for sid in sorted(VO):
     clip = CLIPS[sid]
     dur = round(VO_LEAD + s["duration"] + TAIL, 2)
     skip = TITLE_SETTLE if sid == first else 0
-    if clip["duration"] - skip < dur - 0.05:
-        print(f"warning: scene {sid} clip {clip['duration']}s shorter than {dur}s; last frame will be held", flush=True)
+    avail = round(clip["duration"] - skip, 2)
+    if avail < dur - 0.05:
+        print(f"warning: scene {sid} clip {avail}s after the skip, shorter than {dur}s; last frame will be held", flush=True)
     out = WORK / f"scene_{sid}.mp4"
     lower = OVER / f"lower_{sid}.png"
     inputs = ["-i", clip["clip"], "-i", s["wav"]]
