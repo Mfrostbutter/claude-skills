@@ -62,6 +62,26 @@ top of it. Brand values and rules come from `n8n-brand`; do not retype hex.
    project's `boards/exports/design/`. Write the file key, page and board ids
    into the project's board map and the memory entry.
 
+## Graphic elements (grid, dots, deboss, capsules, nodes)
+
+`assets/toolkit.js` carries the brand's graphic elements as `use_figma` helpers,
+ported from Juanma Ramiau's n8n Design Toolkit plugin (vendored in the harness at
+`designer/brand-2026/figma-toolkit/`, for Figma Desktop): `gridLayout` and
+`guideGrid` (36 px module, 72 margins, native layout grids), `dotGrid` and
+`dotCover` (the six dot presets, masked to the content area, whole dots hidden
+behind a box), `deboss` (the five background themes with their exact inner
+shadows), `pills` (the 72 px capsule with dot or cross connectors), `headline`
+(Baumer 124 / 80 / 32 presets with pink highlights, heights snapped to modules),
+`nodeInstance` and `connect` (the library node component and the editor curve),
+`libLogo` (the brand library lockup by key, with the file's `Logo/*` as fallback).
+Every colour resolves per graphic mode from the frame background (Light, Dark,
+Maker) on the brand team's official values in `designer/brand-2026/n8ndesign.md`;
+`graphic-modes.md` in n8n-brand lists where the plugin differs. Run
+`clearGuides` before handover: the cross grid is never visible in the output.
+Library keys resolved org-wide through the MCP without the library being added
+to the file. Verified 2026-10-29 on the "Toolkit test" page of the video
+backgrounds file, one board per mode.
+
 ## The one-page variant
 
 When the ask is one canvas to publish as a page, build a single 1440-wide frame
