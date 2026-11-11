@@ -20,3 +20,12 @@ Environment: `CUT=<cut>` on every per-cut script (default `main`). The subject's
 before `capture.py` (`set -a; source /abs/path/.env; set +a`) so demo logins and API keys arrive as environment
 variables and never sit in a script. Python deps: `playwright`, `httpx`; `python -m playwright install chromium`.
 ffmpeg and ffprobe on PATH.
+
+## Subject behind an identity proxy (Cloudflare Access, IAP)
+
+A service token usually passes only the API paths, so the UI needs a real browser session. `login.example.py` opens a
+headed Chromium on the subject, the operator signs in once, and the cookies land in `profile/storage_state.json`
+(work dir, never a repo). `Capture(..., storage_state=path)` loads that file into every scene's fresh context, so the
+one-context-per-scene rule still holds. Off-camera prep that needs its own browser (seeding an interview, say) must run
+in a subprocess: a nested `sync_playwright()` inside a scene raises "Sync API inside the asyncio loop".
+Added 2026-10-30 from the Discovery Agent walkthrough.

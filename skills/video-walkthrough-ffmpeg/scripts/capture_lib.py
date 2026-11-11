@@ -134,8 +134,9 @@ class Capture:
     """One cut's recorder. reset(sid, kind) runs off camera before each scene; scenes is [(id, kind, fn)]."""
 
     def __init__(self, root: Path, cut: str = "main", hide_css: str = "", preseed: dict | None = None,
-                 reset=None, color_scheme: str = "dark"):
+                 reset=None, color_scheme: str = "dark", storage_state: str | None = None):
         self.root, self.cut = Path(root), cut
+        self.storage_state = storage_state  # saved Access/login session, loaded into every scene context
         self.vo = {s["id"]: s["duration"] for s in json.loads((self.root / "vo" / cut / "manifest.json").read_text())["scenes"]}
         self.cap = self.root / "captures" / cut
         self.raw = self.cap / "raw"
@@ -157,7 +158,7 @@ class Capture:
         browser = pw.chromium.launch(headless=True)
         ctx = browser.new_context(viewport={"width": W, "height": H}, device_scale_factor=1,
                                   record_video_dir=str(self.raw), record_video_size={"width": W, "height": H},
-                                  color_scheme=self.color_scheme)
+                                  color_scheme=self.color_scheme, storage_state=self.storage_state)
         ctx.add_init_script(self.init_js)
         page = ctx.new_page()
         page.set_default_timeout(45_000)
