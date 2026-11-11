@@ -73,3 +73,17 @@ Dated 2026-10-19, Figma MCP `use_figma` against an org Design file.
   frame at a time and keep the full-page export only as a preview.
 - `get_screenshot` returns a 1024-wide preview URL; download and read it.
   Enough to spot overlaps and clipping, not enough to judge 1px strokes.
+
+## Learned 2026-11-11 (PG Order PoC presenter guide, file 09j5AhjEtO7fpxuD4C7Bu9)
+- A fixed-width column label (`text(..., w=700)`) keeps its 700 px box, so capsules
+  placed at `label.x + label.width` land in the next column. Right-align the capsules to
+  the column's right edge (940 or 1840) instead, or create the label without a width.
+- A 3x3 card grid with a capsule row inside each card needs the card heights equalised
+  per row (`resize(w, maxH)`) and the whole block lifted so the closing pink card clears
+  the footer at y 1004; measure the pink card's bottom and return it.
+- `download_assets` with `defaultFormat: "pdf"` exports each 1920x1080 board as a vector
+  PDF page (130 KB to 1 MB each); join with the macOS Automator `join` tool. The joined
+  file carries one Letter-size MediaBox on the root node, the pages themselves stay
+  1920x1080. No 2x PNG needed for print.
+- Two boards per `use_figma` call (prelude plus about 5 KB of board code) is a safe batch;
+  `artboard()` removes a board by name first, so a retry never duplicates.
